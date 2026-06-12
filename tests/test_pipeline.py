@@ -1,0 +1,99 @@
+"""Integration-ish tests for config loading, DB, proxy and CLI export.
+
+These avoid the network: they exercise the pure/local paths only.
+"""
+
+import csv
+import os
+
+from dia_alpha_monitor import config_loader, defillama
+from dia_alpha_monitor.cli import main
+from dia_alpha_monitor.db import Database
+from dia_alpha_monitor.models import TvlSnapshot, today_str, utcnow
+
+
+def test_db_snapshot_roundtrip(tmp_path):
+    db = Database(str(tmp_path / "t.db"))
+    db.insert("market_snapshots", {
+        "date": today_str(), "ts": utcnow().isoformat(),
+        "price": 0.2, "market_cap": 40_000_000, "volume_24h": 4_000_000,
+        "circulating_supply": 200_000_000, "total_supply": 200_000_000,
+        "fdv": 40_000_000, "change_1d": 1.0, "change_7d": 2.0, "change_30d": 3.0,
+        "source": "test", "stale": 0,
+    })
+    row = db.latest("market_snapshots")
+    assert row["price"] == 0.2
+    db.close()
+
+
+def test_compute_proxy_weights():
+    snaps = [
+        TvlSnapshot(today_str(), utcnow().isoformat(), "a", "A", tvl=100, confidence="high"),
+        TvlSnapshot(today_str(), utcnow().isoformat(), "b", "B", tvl=100, confidence="medium"),
+        TvlSnapshot(today_str(), utcnow().isoformat(), "c", "C", tvl=100, confidence="low"),
+        TvlSnapshot(today_str(), utcnow().isoformat(), "d", "D", tvl=None, confidence="high"),
+    ]
+    proxy = defillama.compute_proxy(snaps)
+    assert proxy["gross_tvl"] == 300
+    # 100*1.0 + 100*0.5 + 100*0.2 = 170
+    assert proxy["confidence_weighted_tvl"] == 170
+    assert proxy["n_resolved"] == 3
+    assert proxy["n_protocols"] == 4
+
+
+def test_config_loaders_return_lists():
+    # Uses the repo's config/ dir; should parse without raising.
+    protocols, _ = config_loader.load_protocols()
+    competitors, _ = config_loader.load_competitors()
+    grants, _ = config_loader.load_grants()
+    news, _ = config_loader.load_news()
+    staking, _ = config_loader.load_staking()
+    assert isinstance(protocols, list) and len(protocols) >= 1
+    assert isinstance(competitors, list) and len(competitors) >= 1
+    assert isinstance(grants, list)
+    assert isinstance(news, list)
+    assert isinstance(staking, list)
+
+
+def test_grants_metrics():
+    grants = [
+        {"chain": "X", "status": "mainnet", "RWA": True, "date_added": "2999-01-01"},
+        {"chain": "Y", "status": "announced", "RWA": False, "date_added": "2000-01-01"},
+    ]
+    m = config_loader.grants_metrics(grants)
+    assert m["total"] == 2
+    assert m["mainnet"] == 1
+    assert m["rwa"] == 1
+    assert m["n_chains"] == 2
+
+
+def test_missing_config_is_graceful(monkeypatch, tmp_path):
+    monkeypatch.setenv("DIA_CONFIG_DIR", str(tmp_path))  # empty dir
+    # reload module-level CONFIG_DIR
+    import importlib
+    from dia_alpha_monitor import config_loader as cl
+    importlib.reload(cl)
+    items, warn = cl.load_protocols()
+    assert items == []
+    assert "missing" in warn
+    importlib.reload(cl)  # restore default for other tests
+
+
+def test_export_command_writes_csvs(tmp_path):
+    db_path = str(tmp_path / "e.db")
+    db = Database(db_path)
+    db.insert("market_snapshots", {
+        "date": today_str(), "ts": utcnow().isoformat(), "price": 0.2,
+        "market_cap": 1, "volume_24h": 1, "circulating_supply": 1,
+        "total_supply": 1, "fdv": 1, "change_1d": 0, "change_7d": 0,
+        "change_30d": 0, "source": "t", "stale": 0,
+    })
+    db.close()
+    out = str(tmp_path / "exports")
+    rc = main(["--db", db_path, "export", "--out", out])
+    assert rc == 0
+    path = os.path.join(out, "market_snapshots.csv")
+    assert os.path.exists(path)
+    with open(path) as fh:
+        rows = list(csv.DictReader(fh))
+    assert rows and rows[0]["price"] == "0.2"

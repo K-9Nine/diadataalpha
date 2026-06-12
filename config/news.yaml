@@ -1,0 +1,46 @@
+# RWA / narrative tracker (manual, human-editable).
+#
+# Fields per item:
+#   date         : YYYY-MM-DD
+#   source       : publication / handle / site
+#   title        : headline
+#   url          : link
+#   category     : RWA | DeFi | staking | Lasernet | integration | competitor
+#   impact_score : 1-5 (5 = thesis-relevant, market-moving)
+#   notes        : free text
+#
+# The report shows the 10 most recent high-impact items (sorted by
+# impact_score then date). Replace the examples with verified entries.
+
+news:
+  - date: "2026-06-05"
+    source: "DIA blog (example)"
+    title: "DIA launches RWA equities + ETF feeds on Lasernet (EXAMPLE)"
+    url: "https://www.diadata.org/blog/"
+    category: RWA
+    impact_score: 5
+    notes: "EXAMPLE placeholder — verify before relying on it."
+
+  - date: "2026-05-22"
+    source: "DIA docs (example)"
+    title: "Lasernet staking live — Feeders securing oracle ops (EXAMPLE)"
+    url: "https://docs.diadata.org/"
+    category: staking
+    impact_score: 4
+    notes: "EXAMPLE placeholder — verify."
+
+  - date: "2026-05-10"
+    source: "Ecosystem (example)"
+    title: "New oracle grant announced for an RWA chain (EXAMPLE)"
+    url: "https://www.diadata.org/oracle-grant/"
+    category: integration
+    impact_score: 3
+    notes: "EXAMPLE placeholder — verify."
+
+  - date: "2026-04-30"
+    source: "Competitor watch (example)"
+    title: "Chainlink expands RWA / proof-of-reserve push (EXAMPLE)"
+    url: "https://chain.link/"
+    category: competitor
+    impact_score: 3
+    notes: "EXAMPLE placeholder — track competitor RWA momentum."

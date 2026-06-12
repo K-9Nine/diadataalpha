@@ -1,0 +1,169 @@
+"""SQLite persistence layer.
+
+One small wrapper class owns the connection and the schema. We store:
+  * ``raw_cache``        - raw API responses (audit / offline inspection),
+  * ``market_snapshots`` - daily DIA market data,
+  * ``tvl_snapshots``    - per-protocol DeFiLlama TVL,
+  * ``tvl_proxy``        - aggregated DIA-linked TVL proxy,
+  * ``competitor_snapshots`` - competitor market data,
+  * ``staking_snapshots``    - ingested manual staking entries,
+  * ``score_snapshots``      - alpha-score history.
+
+Snapshots are append-only so we can compute change-over-time.
+"""
+
+from __future__ import annotations
+
+import os
+import sqlite3
+from typing import Any, Optional
+
+from dia_alpha_monitor.models import utcnow
+
+DEFAULT_DB_PATH = os.environ.get("DIA_DB_PATH", "dia_alpha_monitor.db")
+
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS raw_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    cache_key TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    payload TEXT
+);
+
+CREATE TABLE IF NOT EXISTS market_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    price REAL, market_cap REAL, volume_24h REAL,
+    circulating_supply REAL, total_supply REAL, fdv REAL,
+    change_1d REAL, change_7d REAL, change_30d REAL,
+    source TEXT, stale INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS tvl_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    slug TEXT, name TEXT, tvl REAL,
+    chain_tvls_json TEXT, dia_role TEXT, confidence TEXT,
+    source TEXT, error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS tvl_proxy (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    gross_tvl REAL, confidence_weighted_tvl REAL,
+    n_protocols INTEGER, n_resolved INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS competitor_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    name TEXT, slug TEXT,
+    market_cap REAL, volume_24h REAL, tvs REAL,
+    source TEXT, error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS staking_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    total_staked REAL, feeders INTEGER, apy REAL,
+    lasernet_tx_count REAL, source TEXT, notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS score_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    total REAL, breakdown_json TEXT, notes_json TEXT
+);
+"""
+
+
+class Database:
+    def __init__(self, path: str = DEFAULT_DB_PATH):
+        self.path = path
+        self.conn = sqlite3.connect(path)
+        self.conn.row_factory = sqlite3.Row
+        self.conn.executescript(SCHEMA)
+        self.conn.commit()
+
+    def close(self) -> None:
+        self.conn.close()
+
+    # -- caching -----------------------------------------------------------
+    def cache_raw(self, source: str, cache_key: str, status: str, payload: str) -> None:
+        self.conn.execute(
+            "INSERT INTO raw_cache(source, cache_key, fetched_at, status, payload)"
+            " VALUES (?,?,?,?,?)",
+            (source, cache_key, utcnow().isoformat(), status, payload),
+        )
+        self.conn.commit()
+
+    # -- generic insert helpers -------------------------------------------
+    def insert(self, table: str, row: dict[str, Any]) -> int:
+        cols = ", ".join(row.keys())
+        placeholders = ", ".join("?" for _ in row)
+        cur = self.conn.execute(
+            f"INSERT INTO {table}({cols}) VALUES ({placeholders})",
+            tuple(row.values()),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def latest(self, table: str, where: str = "", params: tuple = ()) -> Optional[sqlite3.Row]:
+        sql = f"SELECT * FROM {table}"
+        if where:
+            sql += f" WHERE {where}"
+        sql += " ORDER BY id DESC LIMIT 1"
+        cur = self.conn.execute(sql, params)
+        return cur.fetchone()
+
+    def previous(self, table: str, where: str = "", params: tuple = ()) -> Optional[sqlite3.Row]:
+        """The row immediately before the latest one (for change calcs)."""
+        sql = f"SELECT * FROM {table}"
+        if where:
+            sql += f" WHERE {where}"
+        sql += " ORDER BY id DESC LIMIT 1 OFFSET 1"
+        cur = self.conn.execute(sql, params)
+        return cur.fetchone()
+
+    def rows_since(self, table: str, days: int) -> list[sqlite3.Row]:
+        """All rows whose date is within ``days`` of now (string compare on date)."""
+        from datetime import timedelta
+
+        cutoff = (utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+        cur = self.conn.execute(
+            f"SELECT * FROM {table} WHERE date >= ? ORDER BY id ASC", (cutoff,)
+        )
+        return cur.fetchall()
+
+    def all_rows(self, table: str) -> list[sqlite3.Row]:
+        cur = self.conn.execute(f"SELECT * FROM {table} ORDER BY id ASC")
+        return cur.fetchall()
+
+    def nearest_before(
+        self, table: str, days_ago: int, value_col: str, where: str = "", params: tuple = ()
+    ) -> Optional[float]:
+        """Return ``value_col`` from the snapshot closest to ``days_ago`` days back.
+
+        Used to compute weekly / 30-day change without assuming daily cadence.
+        """
+        from datetime import timedelta
+
+        target = (utcnow() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        sql = f"SELECT {value_col} AS v, date FROM {table}"
+        clauses = [f"{value_col} IS NOT NULL"]
+        if where:
+            clauses.append(where)
+        sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY ABS(julianday(date) - julianday(?)) ASC LIMIT 1"
+        cur = self.conn.execute(sql, (*params, target))
+        row = cur.fetchone()
+        return None if row is None or row["v"] is None else float(row["v"])
