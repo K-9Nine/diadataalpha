@@ -1,0 +1,51 @@
+# DIA Oracle Grants / adoption tracker (manual, human-editable).
+#
+# Fields per grant:
+#   chain        : target chain / network
+#   project      : project or ecosystem name
+#   date_added   : YYYY-MM-DD when announced / tracked
+#   status       : announced | testnet | mainnet | inactive
+#   product      : Market | Real | Value | Random  (DIA product line)
+#   RWA          : true | false
+#   evidence_url : announcement / docs link
+#   notes        : free text
+#
+# The placeholder rows below are EXAMPLES so the report renders. Replace them
+# with verified entries from DIA's grant announcements.
+
+grants:
+  - chain: Somnia
+    project: Somnia Oracle Grant (example)
+    date_added: "2026-05-20"
+    status: testnet
+    product: Market
+    RWA: false
+    evidence_url: "https://www.diadata.org/oracle-grant/"
+    notes: "EXAMPLE placeholder — verify and replace."
+
+  - chain: Plume
+    project: Plume RWA feeds (example)
+    date_added: "2026-05-28"
+    status: announced
+    product: Real
+    RWA: true
+    evidence_url: "https://www.diadata.org/oracle-grant/"
+    notes: "EXAMPLE placeholder — RWA equities/ETF feeds claim, verify."
+
+  - chain: XRPL EVM
+    project: XRPL EVM sidechain integration (example)
+    date_added: "2026-04-15"
+    status: mainnet
+    product: Market
+    RWA: false
+    evidence_url: "https://www.diadata.org/oracle-grant/"
+    notes: "EXAMPLE placeholder — verify mainnet status."
+
+  - chain: Plume
+    project: Plume Proof-of-Reserve (example)
+    date_added: "2026-06-01"
+    status: announced
+    product: Value
+    RWA: true
+    evidence_url: "https://www.diadata.org/oracle-grant/"
+    notes: "EXAMPLE placeholder — PoR / NAV feed claim, verify."

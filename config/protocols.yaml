@@ -1,0 +1,75 @@
+# DIA-linked protocol watchlist for the DeFiLlama TVL proxy.
+#
+# IMPORTANT: The aggregate built from this file is a "DIA-linked TVL proxy".
+# It is the TVL of protocols we believe use (or may use) DIA oracles. It is
+# NOT official DIA TVS. Verify each entry and update dia_role / confidence /
+# evidence_url before treating any number as real.
+#
+# Fields per protocol:
+#   name        : human label
+#   slug        : DeFiLlama protocol slug (https://defillama.com/protocol/<slug>)
+#   dia_role    : primary_oracle | secondary_oracle | grant_recipient | unknown
+#   confidence  : high | medium | low   (drives the confidence-weighted proxy)
+#   evidence_url: link proving DIA usage (docs/integration/announcement)
+#   notes       : free text
+#
+# Confidence weights: high=1.0, medium=0.5, low=0.2 (see defillama.py).
+# Slugs are best-effort guesses — a wrong slug fails gracefully and is shown
+# as an error in the report. Fix slugs against defillama.com.
+
+protocols:
+  - name: Morpho
+    slug: morpho
+    dia_role: unknown
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "Watchlist. VERIFY whether DIA feeds are actually used."
+
+  - name: Euler
+    slug: euler
+    dia_role: unknown
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "Watchlist. VERIFY oracle provider."
+
+  - name: Silo Finance
+    slug: silo-finance
+    dia_role: unknown
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "Watchlist. VERIFY oracle provider."
+
+  - name: Hydration
+    slug: hydration
+    dia_role: unknown
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "Watchlist (Polkadot/HydraDX). VERIFY DIA usage."
+
+  - name: Zest Protocol
+    slug: zest-protocol
+    dia_role: unknown
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "Watchlist (Bitcoin/Stacks). VERIFY DIA usage."
+
+  - name: Parallel
+    slug: parallel
+    dia_role: unknown
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "Watchlist. Slug may be ambiguous — confirm on DeFiLlama."
+
+  - name: Plume (ecosystem)
+    slug: plume
+    dia_role: grant_recipient
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "RWA chain ecosystem. Slug may differ — confirm on DeFiLlama."
+
+  - name: Somnia (ecosystem)
+    slug: somnia
+    dia_role: grant_recipient
+    confidence: low
+    evidence_url: "https://docs.diadata.org/"
+    notes: "Ecosystem watchlist. Slug may not exist on DeFiLlama yet."

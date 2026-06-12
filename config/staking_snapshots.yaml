@@ -1,0 +1,33 @@
+# Staking / Lasernet manual snapshot log.
+#
+# No reliable free public API is wired up in v1, so enter readings by hand
+# from the DIA staking dashboard / Lasernet explorer. Add a new entry each
+# time you check; the tool computes deltas between the two most recent.
+#
+# Fields per snapshot:
+#   date              : YYYY-MM-DD
+#   total_dia_staked  : DIA tokens staked (number)
+#   feeders           : number of Feeders securing oracle ops
+#   apy               : staking APY (percent, e.g. 7.5)
+#   lasernet_tx_count : cumulative or period Lasernet tx count (if available)
+#   source            : URL / dashboard you read it from
+#   notes             : free text
+#
+# The example rows let the report render and show a delta. Replace them.
+
+snapshots:
+  - date: "2026-05-15"
+    total_dia_staked: 12000000
+    feeders: 8
+    apy: 8.0
+    lasernet_tx_count: 150000
+    source: "https://www.diadata.org/ (EXAMPLE)"
+    notes: "EXAMPLE placeholder — replace with a real reading."
+
+  - date: "2026-06-10"
+    total_dia_staked: 13500000
+    feeders: 10
+    apy: 7.5
+    lasernet_tx_count: 210000
+    source: "https://www.diadata.org/ (EXAMPLE)"
+    notes: "EXAMPLE placeholder — replace with a real reading."

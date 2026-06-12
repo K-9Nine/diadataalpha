@@ -1,0 +1,42 @@
+# Competitor oracle projects for relative-valuation context.
+#
+# Fields:
+#   name         : label used in the report
+#   slug         : short id
+#   coingecko_id : CoinGecko coin id (omit / leave blank if no liquid token)
+#   tvs_usd      : OPTIONAL manual TVS figure (USD) if you have a public one
+#   notes        : free text / source for tvs_usd
+#
+# Find a CoinGecko id from the coin's API page, e.g.
+#   https://api.coingecko.com/api/v3/coins/list  -> match by symbol/name.
+
+competitors:
+  - name: Chainlink
+    slug: link
+    coingecko_id: chainlink
+    tvs_usd: null
+    notes: "Market leader. TVS public on DeFiLlama/chainlink dashboards — enter manually if wanted."
+
+  - name: Pyth
+    slug: pyth
+    coingecko_id: pyth-network
+    tvs_usd: null
+    notes: "Pull-based oracle, strong on Solana + many chains."
+
+  - name: RedStone
+    slug: redstone
+    coingecko_id: redstone-oracles
+    tvs_usd: null
+    notes: "Modular oracle. VERIFY coingecko_id — adjust if the markets call returns no row."
+
+  - name: API3
+    slug: api3
+    coingecko_id: api3
+    tvs_usd: null
+    notes: "First-party oracle / dAPIs + OEV."
+
+  - name: Chronicle
+    slug: chronicle
+    coingecko_id: null
+    tvs_usd: null
+    notes: "No liquid token (as of writing). Manual-only; left as a data gap."

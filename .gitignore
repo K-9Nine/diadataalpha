@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Env / secrets
+.env
+
+# Local database + exports (data artifacts, not source)
+*.db
+exports/*.csv
+
+# Tooling
+.pytest_cache/
+.uv/
+.ruff_cache/
+.DS_Store
