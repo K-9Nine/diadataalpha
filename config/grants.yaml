@@ -53,12 +53,21 @@ grants:
 
   - chain: Hemi
     project: hemiBTC Bitcoin collateral / proof-of-reserve
-    date_added: "2026-02-04"
+    date_added: "2026-06-11"
     status: mainnet
     product: Value
     RWA: false
-    evidence_url: "https://coinmarketcap.com/cmc-ai/dia/latest-updates/"
-    notes: "DIA Value verifies actual BTC reserves backing hemiBTC for accurate collateral valuation on Hemi Network."
+    evidence_url: "https://www.diadata.org/blog/post/hemibtc-fair-value-price-oracle/"
+    notes: "DIA xValue prices hemiBTC from provable BTC reserves (Reserve-Backing) for accurate collateral valuation on Hemi Network's BTC-secured L2."
+
+  - chain: Stacks
+    project: Hermetica USDh reserve-backed stablecoin oracle
+    date_added: "2026-03-11"
+    status: mainnet
+    product: Value
+    RWA: false
+    evidence_url: "https://www.diadata.org/blog/post/hermetica-usdh-reserve-backed-fair-value-oracle/"
+    notes: "DIA xValue computes USDh fair value directly from its BTC + stablecoin reserves on the Stacks Bitcoin L2."
 
   - chain: Multi-chain
     project: River — satUSD omnichain stablecoin pricing

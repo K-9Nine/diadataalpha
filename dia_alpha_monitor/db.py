@@ -7,7 +7,8 @@ One small wrapper class owns the connection and the schema. We store:
   * ``tvl_proxy``        - aggregated DIA-linked TVL proxy,
   * ``competitor_snapshots`` - competitor market data,
   * ``staking_snapshots``    - ingested manual staking entries,
-  * ``score_snapshots``      - alpha-score history.
+  * ``score_snapshots``      - alpha-score history,
+  * ``dia_oracle_snapshots`` - DIA's own API readings (self-price + coverage).
 
 Snapshots are append-only so we can compute change-over-time.
 """
@@ -82,6 +83,15 @@ CREATE TABLE IF NOT EXISTS score_snapshots (
     date TEXT NOT NULL,
     ts TEXT NOT NULL,
     total REAL, breakdown_json TEXT, notes_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dia_oracle_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    dia_price REAL, dia_price_yesterday REAL, volume_yesterday_usd REAL,
+    quoted_assets INTEGER, exchange_sources INTEGER, active_scrapers INTEGER,
+    signature TEXT, source TEXT, error TEXT
 );
 """
 

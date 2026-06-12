@@ -14,6 +14,10 @@ from typing import Any, Optional
 # DIA's token id on CoinGecko. Kept here so it is easy to find/change.
 DIA_COINGECKO_ID = "dia-data"
 
+# DIA token contract on Ethereum — the canonical address DIA's own API prices.
+# Used to query api.diadata.org (DIA pricing its own token, signed).
+DIA_TOKEN_ETHEREUM = "0x84cA8bc7997272c7CfB4D0Cd3D55cd942B3c9419"
+
 # Personal-holding assumptions used in the valuation section. These are the
 # user's stated position and are clearly research inputs, not advice.
 USER_HOLDING_DIA = 500_000
@@ -81,6 +85,31 @@ class CompetitorSnapshot:
     volume_24h: Optional[float] = None
     tvs: Optional[float] = None
     source: str = "coingecko"
+    error: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class DiaOracleSnapshot:
+    """A reading from DIA's own API (api.diadata.org) — the most trusted source.
+
+    Holds DIA's self-reported (signed) price for the DIA token plus coverage
+    stats (how many assets DIA quotes, how many exchange sources it scrapes).
+    All numeric fields are Optional so a partial fetch is never fatal.
+    """
+
+    date: str
+    ts: str
+    dia_price: Optional[float] = None
+    dia_price_yesterday: Optional[float] = None
+    volume_yesterday_usd: Optional[float] = None
+    quoted_assets: Optional[int] = None
+    exchange_sources: Optional[int] = None
+    active_scrapers: Optional[int] = None
+    signature: str = ""
+    source: str = "diadata.org"
     error: str = ""
 
     def as_dict(self) -> dict[str, Any]:

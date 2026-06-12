@@ -17,7 +17,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from dia_alpha_monitor import config_loader, scoring, valuation
+from dia_alpha_monitor import config_loader, dia_api, scoring, valuation
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import (
     DIA_COINGECKO_ID,
@@ -76,6 +76,25 @@ def market_block(db: Database) -> dict[str, Any]:
         "change_30d": row["change_30d"],
         "vol_mcap_ratio": vol_mcap,
         "stale": bool(row["stale"]),
+        "date": row["date"],
+    }
+
+
+def dia_oracle_block(db: Database) -> dict[str, Any]:
+    """Latest reading from DIA's own API (self-price + coverage stats)."""
+    row = db.latest("dia_oracle_snapshots")
+    if row is None:
+        return {"present": False}
+    return {
+        "present": True,
+        "dia_price": row["dia_price"],
+        "dia_price_yesterday": row["dia_price_yesterday"],
+        "volume_yesterday_usd": row["volume_yesterday_usd"],
+        "quoted_assets": row["quoted_assets"],
+        "exchange_sources": row["exchange_sources"],
+        "active_scrapers": row["active_scrapers"],
+        "signed": bool(row["signature"]),
+        "error": row["error"],
         "date": row["date"],
     }
 
@@ -276,6 +295,31 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
         console.print(t)
     else:
         console.print("[red]1. No market data captured yet — run `python -m dia_alpha_monitor run`.[/red]")
+
+    # 1b. DIA's own API — self-reported (signed) price + coverage (primary source)
+    oracle = dia_oracle_block(db)
+    if oracle.get("present"):
+        div = dia_api.price_divergence_pct(oracle["dia_price"], market.get("price"))
+        sig = " [green]✓ signed[/green]" if oracle["signed"] else ""
+        assets = f"{oracle['quoted_assets']:,}" if oracle["quoted_assets"] else "n/a"
+        srcs = oracle["exchange_sources"] if oracle["exchange_sources"] is not None else "n/a"
+        active = oracle["active_scrapers"] if oracle["active_scrapers"] is not None else "n/a"
+        lines = (
+            f"DIA self-reported price{sig}: [bold]{_price(oracle['dia_price'])}[/bold]   "
+            f"vs CoinGecko market: {_price(market.get('price'))}   "
+            f"divergence: {_pct(div)}\n"
+            f"Coverage (primary source): [bold]{assets}[/bold] assets quoted · "
+            f"[bold]{srcs}[/bold] exchange sources ({active} active scrapers)"
+        )
+        if oracle["error"]:
+            lines += f"\n[yellow]partial: {oracle['error']}[/yellow]"
+        console.print(
+            Panel(
+                lines,
+                title="1b. DIA Oracle — self-reported & signed (source: api.diadata.org)",
+                border_style="green",
+            )
+        )
 
     # 2. Volume trend
     t = Table(title="2. Price / Volume Trend", expand=True)

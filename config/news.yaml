@@ -45,21 +45,21 @@ news:
     impact_score: 4
     notes: "Prices tokenized/illiquid assets from on-chain fundamentals (redemption data) rather than thin market trades. Integrated by Euler, Morpho, Silo, Hydration, Hemi."
 
-  - date: "2026-03-31"
-    source: "Crypto Times"
-    title: "Competitor watch: REAL adopts RedStone oracle for RWA growth"
-    url: "https://www.cryptotimes.io/2026/03/31/real-eyes-rwa-growth-with-redstone-oracle-integration/"
-    category: competitor
-    impact_score: 3
-    notes: "RedStone (competitor) winning RWA mandates — track relative RWA momentum vs DIA."
-
-  - date: "2026-02-04"
-    source: "CoinMarketCap (DIA updates)"
-    title: "DIA powers Bitcoin collateral / proof-of-reserve for hemiBTC"
-    url: "https://coinmarketcap.com/cmc-ai/dia/latest-updates/"
+  - date: "2026-06-11"
+    source: "DIA blog"
+    title: "DIA powers fair-value pricing for hemiBTC on Hemi Network (xValue Reserve-Backing)"
+    url: "https://www.diadata.org/blog/post/hemibtc-fair-value-price-oracle/"
     category: integration
     impact_score: 3
-    notes: "DIA Value verifies actual BTC reserves for accurate collateral valuation on Hemi Network."
+    notes: "DIA xValue prices hemiBTC from provable BTC reserves (Reserve-Backing), not market depth — Bitcoin-DeFi collateral on Hemi's BTC-secured L2."
+
+  - date: "2026-03-11"
+    source: "DIA blog"
+    title: "DIA deploys reserve-backed fair-value oracle for Hermetica USDh on Stacks"
+    url: "https://www.diadata.org/blog/post/hermetica-usdh-reserve-backed-fair-value-oracle/"
+    category: integration
+    impact_score: 3
+    notes: "Computes USDh fair value directly from its BTC + stablecoin reserves on the Stacks Bitcoin L2 (DIA xValue / Reserve-Backing)."
 
   - date: "2025-08-06"
     source: "DIA blog"
