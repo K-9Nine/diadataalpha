@@ -10,6 +10,11 @@
 #   slug        : DeFiLlama protocol slug (https://defillama.com/protocol/<slug>)
 #   dia_role    : primary_oracle | secondary_oracle | grant_recipient | unknown
 #   confidence  : high | medium | low   (drives the confidence-weighted proxy)
+#                 Read as: roughly what SHARE of this protocol's TVL is
+#                 plausibly DIA-attributable — NOT merely confidence that DIA
+#                 is used somewhere. Oracle-agnostic giants (Morpho/Euler/Silo)
+#                 stay LOW even though DIA verifiably secures some of their
+#                 markets, because most of their TVL uses other oracles.
 #   evidence_url: link proving DIA usage (docs/integration/announcement)
 #   notes       : free text
 #   kind        : protocol (default) | chain. For "chain" entries the slug is
@@ -23,58 +28,58 @@
 protocols:
   - name: Morpho
     slug: morpho
-    dia_role: unknown
+    dia_role: secondary_oracle
     confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist. VERIFY whether DIA feeds are actually used."
+    evidence_url: "https://www.diadata.org/blog/post/2025-partnerships-integrations/"
+    notes: "DIA secures specific Morpho markets/vaults on Ethereum & Base (DIA Value for illiquid collateral). Morpho is oracle-agnostic per market, so only a slice of the ~$10B TVL is DIA-priced — confidence kept LOW so the weighted proxy isn't dominated by TVL that mostly uses other oracles."
 
   - name: Euler
     slug: euler
-    dia_role: unknown
+    dia_role: secondary_oracle
     confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist. VERIFY oracle provider."
+    evidence_url: "https://www.diadata.org/blog/post/2025-partnerships-integrations/"
+    notes: "DIA secures select Euler markets/vaults on Ethereum & Base; DIA Value integrated. Per-market oracle choice, so only a fraction of TVL is DIA-attributable -> LOW."
 
   - name: Silo Finance
     slug: silo-finance
-    dia_role: unknown
+    dia_role: secondary_oracle
     confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist. VERIFY oracle provider."
+    evidence_url: "https://www.diadata.org/blog/post/2025-partnerships-integrations/"
+    notes: "DIA secures select Silo markets; DIA Value integrated for illiquid collateral. Isolated-market design, so only a fraction of TVL is DIA-attributable -> LOW."
 
   - name: Hydration
     slug: hydration
-    dia_role: unknown
-    confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist (Polkadot/HydraDX). VERIFY DIA usage."
+    dia_role: primary_oracle
+    confidence: high
+    evidence_url: "https://www.diadata.org/blog/post/2025-partnerships-integrations/"
+    notes: "DIA powers Hydration lending markets across 12 assets on Polkadot via custom on-chain DEX scrapers (Hydration + Bifrost). Substantial, protocol-level integration -> primary/high."
 
   - name: Zest Protocol
     slug: zest-v2
-    dia_role: unknown
-    confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist (Bitcoin/Stacks). Resolved to zest-v2 (zest-protocol/v1 is dead, TVL 0). VERIFY DIA usage."
+    dia_role: secondary_oracle
+    confidence: medium
+    evidence_url: "https://www.diadata.org/blog/post/2025-partnerships-integrations/"
+    notes: "Named by DIA as a high-impact DeFi integration (Bitcoin/Stacks). Resolved to zest-v2 (zest-protocol/v1 is dead, TVL 0). Scope of DIA usage not fully detailed -> secondary/medium."
 
   - name: Parallel
     slug: parallel-protocol-v3
-    dia_role: unknown
-    confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist. Resolved to parallel-protocol-v3 (CDP stablecoin). VERIFY DIA usage."
+    dia_role: primary_oracle
+    confidence: high
+    evidence_url: "https://www.diadata.org/blog/post/dia-powers-oracle-infrastructure-for-parallel-stablecoins/"
+    notes: "DIA is the oracle provider for Parallel's USDp/sUSDp stablecoins (DIA Value fundamental feeds + market feeds, AggregatorV3 adapters) live on HyperEVM, Sonic, Base, Avalanche. Primary/high. NOTE: parallel-protocol-v3 TVL is small (~$3M); the DIA integration spans newer deployments."
 
   - name: Plume (ecosystem)
     slug: Plume Mainnet
     kind: chain
     dia_role: grant_recipient
     confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "RWA chain ecosystem. Chain-level TVL via /v2/historicalChainTvl."
+    evidence_url: "https://www.diadata.org/blog/post/mainnet-staking-blockchain-oracle-grants/"
+    notes: "Oracle Grant partner chain; DIA provides RWA feeds (equities/FX/commodities/bonds). Chain-level TVL via /v2/historicalChainTvl — most chain TVL is NOT DIA-secured, so confidence stays low."
 
   - name: Somnia (ecosystem)
     slug: Somnia
     kind: chain
     dia_role: grant_recipient
     confidence: low
-    evidence_url: "https://docs.diadata.org/"
-    notes: "Ecosystem watchlist. Chain-level TVL via /v2/historicalChainTvl."
+    evidence_url: "https://www.diadata.org/blog/post/mainnet-staking-blockchain-oracle-grants/"
+    notes: "Oracle Grant partner chain (DeFi + RWA). Chain-level TVL via /v2/historicalChainTvl — chain-wide, not DIA-attributable, so confidence low."

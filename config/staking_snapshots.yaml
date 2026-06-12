@@ -16,18 +16,18 @@
 # The example rows let the report render and show a delta. Replace them.
 
 snapshots:
-  - date: "2026-05-15"
-    total_dia_staked: 12000000
-    feeders: 8
-    apy: 8.0
-    lasernet_tx_count: 150000
-    source: "https://www.diadata.org/ (EXAMPLE)"
-    notes: "EXAMPLE placeholder — replace with a real reading."
+  - date: "2025-06-24"
+    total_dia_staked: 2000000
+    feeders: null
+    apy: null
+    lasernet_tx_count: null
+    source: "https://www.diadata.org/blog/post/mainnet-staking-blockchain-oracle-grants/"
+    notes: "Mainnet staking + Oracle Grants launch: ~2M DIA released to secure Lasernet. Feeder count/APY at launch not separately verified (bootstrapping phase; Genesis staking offered up to 30% in late 2024)."
 
-  - date: "2026-06-10"
-    total_dia_staked: 13500000
-    feeders: 10
-    apy: 7.5
-    lasernet_tx_count: 210000
-    source: "https://www.diadata.org/ (EXAMPLE)"
-    notes: "EXAMPLE placeholder — replace with a real reading."
+  - date: "2026-06-05"
+    total_dia_staked: 4400000
+    feeders: 11
+    apy: 12.56
+    lasernet_tx_count: null
+    source: "https://www.diadata.org/blog/post/update-on-dia-staking/"
+    notes: "4.4M DIA staked, 11+ Feeders across 60+ chains (Liquify, Chainbase, Stakecraft, Globalstake, Blockscape, Aleno, Swyke, Stakin). APY 12.56% is the live app reading on 2026-06-12; recalibrates to ~5-6% on 2026-07-01. Lasernet tx count not publicly exposed -> null."

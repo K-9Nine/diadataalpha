@@ -10,37 +10,77 @@
 #   notes        : free text
 #
 # The report shows the 10 most recent high-impact items (sorted by
-# impact_score then date). Replace the examples with verified entries.
+# impact_score then date). Verified from primary sources (researched 2026-06-12).
 
 news:
   - date: "2026-06-05"
-    source: "DIA blog (example)"
-    title: "DIA launches RWA equities + ETF feeds on Lasernet (EXAMPLE)"
-    url: "https://www.diadata.org/blog/"
-    category: RWA
-    impact_score: 5
-    notes: "EXAMPLE placeholder — verify before relying on it."
-
-  - date: "2026-05-22"
-    source: "DIA docs (example)"
-    title: "Lasernet staking live — Feeders securing oracle ops (EXAMPLE)"
-    url: "https://docs.diadata.org/"
+    source: "DIA blog"
+    title: "DIA staking enters next phase — yield recalibrates to ~5-6% APY on Jul 1"
+    url: "https://www.diadata.org/blog/post/update-on-dia-staking/"
     category: staking
-    impact_score: 4
-    notes: "EXAMPLE placeholder — verify."
+    impact_score: 3
+    notes: "4.4M DIA staked, 11+ Feeders across 60+ chains; one year of Lasernet mainnet staking complete."
 
-  - date: "2026-05-10"
-    source: "Ecosystem (example)"
-    title: "New oracle grant announced for an RWA chain (EXAMPLE)"
-    url: "https://www.diadata.org/oracle-grant/"
+  - date: "2026-03-22"
+    source: "DIA blog"
+    title: "DIA partners with River for omnichain satUSD stablecoin pricing"
+    url: "https://www.diadata.org/blog/post/dia-partners-river-oracle-pricing-stablecoin/"
     category: integration
     impact_score: 3
-    notes: "EXAMPLE placeholder — verify."
+    notes: "Market feeds on Ethereum/BNB/BOB/Arbitrum/Base + DIA Value CER feed for satUSD+ (blog dated Mar 12)."
 
-  - date: "2026-04-30"
-    source: "Competitor watch (example)"
-    title: "Chainlink expands RWA / proof-of-reserve push (EXAMPLE)"
-    url: "https://chain.link/"
+  - date: "2026-03-13"
+    source: "DIA blog"
+    title: "DIA becomes oracle provider for Parallel Protocol stablecoins (USDp/sUSDp)"
+    url: "https://www.diadata.org/blog/post/dia-powers-oracle-infrastructure-for-parallel-stablecoins/"
+    category: integration
+    impact_score: 4
+    notes: "Fundamental + market feeds via AggregatorV3 adapters on HyperEVM, Sonic, Base, Avalanche. Watchlist protocol."
+
+  - date: "2026-03-10"
+    source: "DIA blog"
+    title: "DIA Value oracle launches to price $100B+ of illiquid DeFi assets"
+    url: "https://www.diadata.org/blog/post/intrinsic-valuation-oracle-institutional-defi/"
+    category: DeFi
+    impact_score: 4
+    notes: "Prices tokenized/illiquid assets from on-chain fundamentals (redemption data) rather than thin market trades. Integrated by Euler, Morpho, Silo, Hydration, Hemi."
+
+  - date: "2026-03-31"
+    source: "Crypto Times"
+    title: "Competitor watch: REAL adopts RedStone oracle for RWA growth"
+    url: "https://www.cryptotimes.io/2026/03/31/real-eyes-rwa-growth-with-redstone-oracle-integration/"
     category: competitor
     impact_score: 3
-    notes: "EXAMPLE placeholder — track competitor RWA momentum."
+    notes: "RedStone (competitor) winning RWA mandates — track relative RWA momentum vs DIA."
+
+  - date: "2026-02-04"
+    source: "CoinMarketCap (DIA updates)"
+    title: "DIA powers Bitcoin collateral / proof-of-reserve for hemiBTC"
+    url: "https://coinmarketcap.com/cmc-ai/dia/latest-updates/"
+    category: integration
+    impact_score: 3
+    notes: "DIA Value verifies actual BTC reserves for accurate collateral valuation on Hemi Network."
+
+  - date: "2025-08-06"
+    source: "DIA blog"
+    title: "Zoniqx integrates DIA oracles to power institutional RWAs on XRPL"
+    url: "https://www.diadata.org/blog/post/zoniqx-dia-oracles-power-rwas-on-xrpl/"
+    category: RWA
+    impact_score: 4
+    notes: "Pricing, proof-of-reserve and market data for tokenized real estate/commodities/debt via Zoniqx DyCIST (ERC-7518)."
+
+  - date: "2025-06-24"
+    source: "DIA blog"
+    title: "DIA launches mainnet staking + multichain Oracle Grants program"
+    url: "https://www.diadata.org/blog/post/mainnet-staking-blockchain-oracle-grants/"
+    category: staking
+    impact_score: 5
+    notes: "~2M DIA released to secure Lasernet; cost-free oracles across 20 partner chains. Core thesis event (token utility + adoption flywheel)."
+
+  - date: "2025-02-19"
+    source: "DIA blog"
+    title: "DIA Real launches — first comprehensive RWA oracle suite (100+ assets)"
+    url: "https://www.diadata.org/blog/post/dia-launches-first-oracle-for-real-world-assets-rwas/"
+    category: RWA
+    impact_score: 5
+    notes: "Stocks, commodities, ETFs, FX on-chain (20,000+ assets supported per grant page). Anchors the RWA thesis."

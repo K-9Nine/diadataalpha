@@ -88,11 +88,22 @@ Key design rules to preserve:
 
 ## Suggested next steps
 - [x] Run live, fix wrong CoinGecko ids / DeFiLlama slugs (done 2026-06-12).
-- [ ] Replace the `EXAMPLE` placeholder rows in `config/grants.yaml`,
-      `news.yaml`, `staking_snapshots.yaml` with verified entries. **This is now
-      the main remaining data-quality task** — these are still placeholders.
-- [ ] Set real `dia_role` / `confidence` / `evidence_url` per watchlist protocol
-      once DIA-usage is confirmed (all are currently `unknown`/`low`).
+- [x] Replace the `EXAMPLE` placeholder rows in `config/grants.yaml`,
+      `news.yaml`, `staking_snapshots.yaml` with verified, source-linked entries
+      (done 2026-06-12 via web research — every row links a primary source).
+- [x] Set real `dia_role` / `confidence` / `evidence_url` per watchlist protocol.
+      All 8 verified against DIA's own integration announcements: Parallel &
+      Hydration = primary_oracle/high; Morpho/Euler/Silo/Zest = secondary_oracle
+      (Morpho/Euler/Silo kept confidence=low on purpose — DIA only secures
+      *select* markets, so their multi-$B TVL is NOT DIA-attributable);
+      Plume/Somnia = grant_recipient/low.
+      NOTE on `confidence`: it now means "share of this protocol's TVL plausibly
+      DIA-attributable", which is why oracle-agnostic giants stay LOW. See the
+      header comment in `config/protocols.yaml`.
+- [ ] Data is a point-in-time snapshot (researched 2026-06-12). Refresh the
+      staking reading (APY recalibrates to ~5-6% on 2026-07-01) and add new
+      grants/news as DIA ships them. `lasernet_tx_count` is left null — no
+      public free endpoint found; wire one up if/when available.
 - [ ] (Optional) Add a `doctor` subcommand: ping both APIs + resolve every
       configured id/slug and print a "resolved vs failed" table — makes the
       first live run self-diagnosing.
