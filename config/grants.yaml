@@ -10,42 +10,70 @@
 #   evidence_url : announcement / docs link
 #   notes        : free text
 #
-# The placeholder rows below are EXAMPLES so the report renders. Replace them
-# with verified entries from DIA's grant announcements.
+# Verified from DIA announcements (researched 2026-06-12). Each row links to a
+# primary source. The Oracle Grants program launched 2025-06-24 across 20
+# partner chains; protocol-level integrations are tracked as adoption too.
 
 grants:
-  - chain: Somnia
-    project: Somnia Oracle Grant (example)
-    date_added: "2026-05-20"
-    status: testnet
-    product: Market
-    RWA: false
-    evidence_url: "https://www.diadata.org/oracle-grant/"
-    notes: "EXAMPLE placeholder — verify and replace."
-
-  - chain: Plume
-    project: Plume RWA feeds (example)
-    date_added: "2026-05-28"
-    status: announced
-    product: Real
-    RWA: true
-    evidence_url: "https://www.diadata.org/oracle-grant/"
-    notes: "EXAMPLE placeholder — RWA equities/ETF feeds claim, verify."
-
-  - chain: XRPL EVM
-    project: XRPL EVM sidechain integration (example)
-    date_added: "2026-04-15"
+  - chain: Multi-chain
+    project: DIA Oracle Grants program launch (20 partner chains)
+    date_added: "2025-06-24"
     status: mainnet
     product: Market
     RWA: false
-    evidence_url: "https://www.diadata.org/oracle-grant/"
-    notes: "EXAMPLE placeholder — verify mainnet status."
+    evidence_url: "https://www.diadata.org/blog/post/mainnet-staking-blockchain-oracle-grants/"
+    notes: "Cost-free oracles (up to 12 months) across 20 ecosystems incl. Arbitrum, Polygon, Avalanche, BNB Chain, Plume, Somnia, Sonic, Stacks, Linea, LUKSO, Kadena, BOB, Aurora, Ankr, Alephium, GEB, Gelato, Goat Network, Midnight, Superseed."
 
   - chain: Plume
-    project: Plume Proof-of-Reserve (example)
-    date_added: "2026-06-01"
-    status: announced
-    product: Value
+    project: Plume RWA oracle feeds (grant partner)
+    date_added: "2025-06-24"
+    status: mainnet
+    product: Real
     RWA: true
-    evidence_url: "https://www.diadata.org/oracle-grant/"
-    notes: "EXAMPLE placeholder — PoR / NAV feed claim, verify."
+    evidence_url: "https://www.diadata.org/blog/post/2025-partnerships-integrations/"
+    notes: "RWA chain; DIA provides equities, FX, commodities, bonds and interest-rate feeds. Grant partner ecosystem."
+
+  - chain: Somnia
+    project: Somnia oracle integration (grant partner)
+    date_added: "2025-06-24"
+    status: mainnet
+    product: Market
+    RWA: false
+    evidence_url: "https://www.diadata.org/blog/post/2025-partnerships-integrations/"
+    notes: "Grant partner ecosystem; DIA feeds across DeFi and RWA use cases on Somnia."
+
+  - chain: XRPL
+    project: Zoniqx — institutional RWA tokenization on XRP Ledger
+    date_added: "2025-08-06"
+    status: mainnet
+    product: Real
+    RWA: true
+    evidence_url: "https://www.diadata.org/blog/post/zoniqx-dia-oracles-power-rwas-on-xrpl/"
+    notes: "DIA pricing, proof-of-reserve and market data for tokenized RWAs (real estate, commodities, debt) via Zoniqx DyCIST (ERC-7518) on XRPL."
+
+  - chain: Hemi
+    project: hemiBTC Bitcoin collateral / proof-of-reserve
+    date_added: "2026-02-04"
+    status: mainnet
+    product: Value
+    RWA: false
+    evidence_url: "https://coinmarketcap.com/cmc-ai/dia/latest-updates/"
+    notes: "DIA Value verifies actual BTC reserves backing hemiBTC for accurate collateral valuation on Hemi Network."
+
+  - chain: Multi-chain
+    project: River — satUSD omnichain stablecoin pricing
+    date_added: "2026-03-12"
+    status: mainnet
+    product: Market
+    RWA: false
+    evidence_url: "https://www.diadata.org/blog/post/dia-partners-river-oracle-pricing-stablecoin/"
+    notes: "DIA market feeds for satUSD on Ethereum, BNB Chain, BOB, Arbitrum, Base; DIA Value CER feed for satUSD+. Omni-CDP via LayerZero."
+
+  - chain: Multi-chain
+    project: Parallel Protocol — USDp/sUSDp stablecoin oracle
+    date_added: "2026-03-13"
+    status: mainnet
+    product: Value
+    RWA: false
+    evidence_url: "https://www.diadata.org/blog/post/dia-powers-oracle-infrastructure-for-parallel-stablecoins/"
+    notes: "DIA is the oracle provider: fundamental (redemption-data) + market feeds via AggregatorV3 adapters on HyperEVM, Sonic, Base, Avalanche."

@@ -88,11 +88,15 @@ def tvl_block(db: Database) -> dict[str, Any]:
         prev_30d = db.nearest_before("tvl_proxy", 30, "gross_tvl")
         weekly = _pct_change(proxy["gross_tvl"], prev_7d)
         monthly = _pct_change(proxy["gross_tvl"], prev_30d)
-    # latest per-protocol snapshots from the most recent run date
+    # latest per-protocol snapshots from the most recent run date. The table is
+    # append-only, so a second run on the same day writes a fresh row per slug;
+    # keep only the newest (MAX(id)) row per slug to avoid duplicate listings.
     protocols: list[dict] = []
     if proxy is not None:
         rows = db.conn.execute(
-            "SELECT * FROM tvl_snapshots WHERE date = ? ORDER BY tvl DESC NULLS LAST",
+            "SELECT * FROM tvl_snapshots WHERE id IN ("
+            "  SELECT MAX(id) FROM tvl_snapshots WHERE date = ? GROUP BY slug"
+            ") ORDER BY tvl DESC NULLS LAST",
             (proxy["date"],),
         ).fetchall()
         protocols = [dict(r) for r in rows]
@@ -114,7 +118,9 @@ def competitor_block(db: Database) -> dict[str, Any]:
     rows: list[dict] = []
     if latest is not None:
         cur = db.conn.execute(
-            "SELECT * FROM competitor_snapshots WHERE date = ? ORDER BY market_cap DESC NULLS LAST",
+            "SELECT * FROM competitor_snapshots WHERE id IN ("
+            "  SELECT MAX(id) FROM competitor_snapshots WHERE date = ? GROUP BY slug"
+            ") ORDER BY market_cap DESC NULLS LAST",
             (latest["date"],),
         )
         rows = [dict(r) for r in cur.fetchall()]

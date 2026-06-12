@@ -27,7 +27,7 @@ competitors:
     slug: redstone
     coingecko_id: redstone-oracles
     tvs_usd: null
-    notes: "Modular oracle. VERIFY coingecko_id — adjust if the markets call returns no row."
+    notes: "Modular oracle. coingecko_id verified working (2026-06-12). Winning RWA mandates (e.g. REAL, Mar 2026) — closest competitor on the RWA narrative."
 
   - name: API3
     slug: api3

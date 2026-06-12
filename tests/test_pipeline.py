@@ -6,7 +6,7 @@ These avoid the network: they exercise the pure/local paths only.
 import csv
 import os
 
-from dia_alpha_monitor import config_loader, defillama
+from dia_alpha_monitor import config_loader, defillama, reporting
 from dia_alpha_monitor.cli import main
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import TvlSnapshot, today_str, utcnow
@@ -39,6 +39,59 @@ def test_compute_proxy_weights():
     assert proxy["confidence_weighted_tvl"] == 170
     assert proxy["n_resolved"] == 3
     assert proxy["n_protocols"] == 4
+
+
+def test_chain_kind_uses_chain_endpoint(monkeypatch):
+    """`kind: chain` entries read the latest point of the chain TVL series."""
+    calls = {}
+
+    def fake_get_json(url, **kwargs):
+        calls["url"] = url
+        return [{"date": 1, "tvl": 100.0}, {"date": 2, "tvl": 250.5}], None
+
+    monkeypatch.setattr(defillama, "get_json", fake_get_json)
+    snap = defillama.fetch_protocol_tvl(
+        {"name": "Plume (ecosystem)", "slug": "Plume Mainnet", "kind": "chain"}
+    )
+    assert "/v2/historicalChainTvl/Plume Mainnet" in calls["url"]
+    assert snap.tvl == 250.5  # latest point, not the first
+    assert snap.error == ""
+
+
+def test_protocol_kind_uses_protocol_endpoint(monkeypatch):
+    """Default (no kind) entries still hit /protocol/{slug}."""
+    calls = {}
+
+    def fake_get_json(url, **kwargs):
+        calls["url"] = url
+        return {"currentChainTvls": {"Ethereum": 10.0, "Ethereum-staking": 5.0}}, None
+
+    monkeypatch.setattr(defillama, "get_json", fake_get_json)
+    snap = defillama.fetch_protocol_tvl({"name": "Euler", "slug": "euler"})
+    assert "/protocol/euler" in calls["url"]
+    assert snap.tvl == 10.0  # -staking suffix excluded from headline
+
+
+def test_tvl_report_dedupes_per_slug_on_rerun(tmp_path):
+    """Re-running the same day must not duplicate protocol rows in the report."""
+    db = Database(str(tmp_path / "d.db"))
+    date = today_str()
+    db.insert("tvl_proxy", {
+        "date": date, "ts": utcnow().isoformat(), "gross_tvl": 200,
+        "confidence_weighted_tvl": 40, "n_protocols": 1, "n_resolved": 1,
+    })
+    # two runs on the same day write two rows for the same slug
+    for tvl in (100.0, 150.0):
+        db.insert("tvl_snapshots", {
+            "date": date, "ts": utcnow().isoformat(), "slug": "morpho",
+            "name": "Morpho", "tvl": tvl, "chain_tvls_json": "{}",
+            "dia_role": "unknown", "confidence": "low", "source": "t", "error": "",
+        })
+    block = reporting.tvl_block(db)
+    rows = block["protocols"]
+    assert len(rows) == 1  # deduped to one row per slug
+    assert rows[0]["tvl"] == 150.0  # newest snapshot wins
+    db.close()
 
 
 def test_config_loaders_return_lists():
