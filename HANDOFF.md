@@ -119,7 +119,8 @@ Key design rules to preserve:
 - [ ] (Optional) Add a `doctor` subcommand: ping both APIs + resolve every
       configured id/slug and print a "resolved vs failed" table — makes the
       first live run self-diagnosing.
-- [ ] (Optional) Add a CI workflow that runs `pytest`.
+- [x] CI workflow running `pytest` (`.github/workflows/ci.yml`, uv, py3.11+3.12,
+      offline tests) — added 2026-06-12.
 - [ ] v2 ideas: RSS auto-ingest for the news tracker; an on-chain collector for
       *actual* DIA oracle reads/fees (the real usage signal behind the proxy).
 

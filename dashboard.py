@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover
         "  uv pip install -e '.[dashboard]'   (or)   pip install streamlit"
     )
 
-from dia_alpha_monitor import reporting, valuation
+from dia_alpha_monitor import dia_api, reporting, valuation
 from dia_alpha_monitor.db import Database
 
 DB_PATH = os.environ.get("DIA_DB_PATH", "dia_alpha_monitor.db")
@@ -61,6 +61,20 @@ c3.metric("DIA-linked TVL proxy", f"${(tvl['gross_tvl'] or 0)/1e6:.1f}M",
 c4.metric("Alpha score", f"{agg['total']:.1f}/100")
 
 st.info("The TVL figure is a DIA-linked PROXY (TVL of watchlisted protocols), NOT official DIA TVS.")
+
+oracle = reporting.dia_oracle_block(db)
+if oracle.get("present"):
+    st.subheader("DIA Oracle — self-reported & signed (source: api.diadata.org)")
+    div = dia_api.price_divergence_pct(oracle["dia_price"], market.get("price"))
+    o1, o2, o3, o4 = st.columns(4)
+    o1.metric("DIA self-price" + (" ✓signed" if oracle["signed"] else ""),
+              f"${oracle['dia_price']:.4f}" if oracle["dia_price"] else "n/a")
+    o2.metric("Divergence vs CoinGecko", f"{div:+.2f}%" if div is not None else "n/a")
+    o3.metric("Assets quoted", f"{oracle['quoted_assets']:,}" if oracle["quoted_assets"] else "n/a")
+    o4.metric("Active scrapers",
+              f"{oracle['active_scrapers']}/{oracle['exchange_sources']}"
+              if oracle["exchange_sources"] is not None else "n/a")
+    st.caption("DIA's own signed price + coverage — a primary-source cross-check on the market data.")
 
 st.subheader("Alpha score breakdown")
 st.dataframe(pd.DataFrame(agg["categories"]), use_container_width=True)
