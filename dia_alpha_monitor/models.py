@@ -117,6 +117,55 @@ class DiaOracleSnapshot:
 
 
 @dataclass
+class FeedActivitySnapshot:
+    """Daily snapshot of DIA feed coverage, split by asset class.
+
+    Sourced from DIA's own API (quoted assets + exchange sources). The RWA vs
+    crypto split is best-effort: the free REST endpoint is crypto-token-centric,
+    so ``rwa_feeds`` reflects only what that endpoint exposes (see
+    ``feed_activity.py``).
+    """
+
+    date: str
+    ts: str
+    total_feeds: Optional[int] = None
+    rwa_feeds: Optional[int] = None
+    crypto_feeds: Optional[int] = None
+    n_blockchains: Optional[int] = None
+    active_sources: Optional[int] = None
+    source: str = "diadata.org"
+    error: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class OracleActivitySnapshot:
+    """On-chain DIA oracle update activity for one configured EVM chain.
+
+    ``update_count`` is the number of logs emitted by the oracle contract over
+    ``[from_block, to_block]`` — a direct, on-chain usage signal. Everything is
+    Optional/graceful so an unreachable RPC never breaks a run.
+    """
+
+    date: str
+    ts: str
+    chain: str
+    oracle_address: str = ""
+    rpc_url: str = ""
+    update_count: Optional[int] = None
+    latest_block: Optional[int] = None
+    from_block: Optional[int] = None
+    to_block: Optional[int] = None
+    source: str = "evm-rpc"
+    error: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class ScoreSnapshot:
     date: str
     ts: str

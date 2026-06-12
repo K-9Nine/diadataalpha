@@ -17,7 +17,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from dia_alpha_monitor import config_loader, dia_api, scoring, valuation
+from dia_alpha_monitor import alerts, config_loader, dia_api, grants as grant_analysis, scoring, valuation
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import (
     DIA_COINGECKO_ID,
@@ -102,7 +102,11 @@ def dia_oracle_block(db: Database) -> dict[str, Any]:
 def tvl_block(db: Database) -> dict[str, Any]:
     proxy = db.latest("tvl_proxy")
     weekly = monthly = None
-    if proxy is not None:
+    # Trend changes are only trustworthy with >= 7 days of history; below that
+    # we report INSUFFICIENT DATA instead of a misleading ~0% (see scoring.py).
+    history_days = db.history_span_days("tvl_proxy")
+    enough_history = history_days >= scoring.MIN_TREND_HISTORY_DAYS
+    if proxy is not None and enough_history:
         prev_7d = db.nearest_before("tvl_proxy", 7, "gross_tvl")
         prev_30d = db.nearest_before("tvl_proxy", 30, "gross_tvl")
         weekly = _pct_change(proxy["gross_tvl"], prev_7d)
@@ -129,7 +133,38 @@ def tvl_block(db: Database) -> dict[str, Any]:
         "monthly_change": monthly,
         "protocols": protocols,
         "date": proxy["date"] if proxy else None,
+        "history_days": history_days,
+        "insufficient_history": proxy is not None and not enough_history,
     }
+
+
+def feed_activity_block(db: Database) -> dict[str, Any]:
+    """Latest DIA feed-coverage snapshot (total/RWA/crypto/chains/sources)."""
+    row = db.latest("feed_activity_snapshots")
+    if row is None:
+        return {"present": False}
+    return {
+        "present": True,
+        "total_feeds": row["total_feeds"],
+        "rwa_feeds": row["rwa_feeds"],
+        "crypto_feeds": row["crypto_feeds"],
+        "n_blockchains": row["n_blockchains"],
+        "active_sources": row["active_sources"],
+        "error": row["error"],
+        "date": row["date"],
+    }
+
+
+def oracle_activity_block(db: Database) -> dict[str, Any]:
+    """Latest on-chain oracle-activity reading per configured chain."""
+    rows = db.conn.execute(
+        "SELECT * FROM oracle_activity_snapshots WHERE id IN ("
+        "  SELECT MAX(id) FROM oracle_activity_snapshots GROUP BY chain"
+        ") ORDER BY chain ASC"
+    ).fetchall()
+    chains = [dict(r) for r in rows]
+    total = sum(c["update_count"] or 0 for c in chains)
+    return {"present": bool(chains), "chains": chains, "total_updates": total}
 
 
 def competitor_block(db: Database) -> dict[str, Any]:
@@ -176,7 +211,10 @@ def compute_alpha(db: Database) -> dict[str, Any]:
             market.get("change_7d"), market.get("change_30d"), market.get("vol_mcap_ratio")
         ),
         scoring.score_tvl_growth(
-            tvl.get("weekly_change"), tvl.get("monthly_change"), tvl.get("n_resolved", 0)
+            tvl.get("weekly_change"),
+            tvl.get("monthly_change"),
+            tvl.get("n_resolved", 0),
+            history_days=tvl.get("history_days"),
         ),
         scoring.score_grants(gm["new_30d"], gm["mainnet"], gm["total"]),
         scoring.score_rwa(gm["rwa"], nm["rwa_recent_30d"], nm["rwa_total"]),
@@ -190,6 +228,7 @@ def compute_alpha(db: Database) -> dict[str, Any]:
     agg["grants_metrics"] = gm
     agg["news_metrics"] = nm
     agg["staking_metrics"] = sm
+    agg["grant_funnel"] = grant_analysis.grant_funnel(grants)
     return agg
 
 
@@ -278,6 +317,29 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
         "Proxy and manual data are labelled as such.[/dim]\n"
     )
 
+    # [ALERT] — metrics that moved > 10% week-over-week (top of report)
+    fired = alerts.week_over_week_alerts(db)
+    if fired:
+        def _fmt(v, kind):
+            if v is None:
+                return "n/a"
+            if kind == "price":
+                return _price(v)
+            if kind == "money":
+                return _money(v)
+            return f"{v:,.0f}"
+        lines = []
+        for a in fired:
+            arrow = "▲" if a["direction"] == "up" else "▼"
+            lines.append(
+                f"{arrow} [bold]{a['metric']}[/bold] {a['pct']:+.1f}% WoW  "
+                f"({_fmt(a['old'], a['fmt'])} → {_fmt(a['new'], a['fmt'])})"
+            )
+        console.print(
+            Panel("\n".join(lines), title="[ALERT] >10% week-over-week moves",
+                  border_style="red")
+        )
+
     # 1. Price & market cap
     if market.get("present"):
         stale = " [yellow](STALE)[/yellow]" if market.get("stale") else ""
@@ -321,6 +383,23 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
             )
         )
 
+    # 1c. Feed coverage by asset class (DIA's own API; snapshotted daily)
+    feeds = feed_activity_block(db)
+    if feeds.get("present"):
+        total = feeds["total_feeds"]
+        fl = (
+            f"Total feeds: [bold]{total:,}[/bold]   "
+            f"crypto: {feeds['crypto_feeds']:,}   "
+            f"RWA*: {feeds['rwa_feeds']}   "
+            f"blockchains: {feeds['n_blockchains']}   "
+            f"active sources: {feeds['active_sources']}\n"
+            f"[dim]*RWA is a floor — the free REST endpoint is crypto-token-centric; "
+            f"DIA's full RWA/xReal catalogue isn't enumerated there. Tracked daily for growth.[/dim]"
+        ) if total is not None else "[yellow]feed coverage unavailable[/yellow]"
+        if feeds["error"]:
+            fl += f"\n[yellow]partial: {feeds['error']}[/yellow]"
+        console.print(Panel(fl, title="1c. Feed Coverage (source: api.diadata.org)", border_style="green"))
+
     # 2. Volume trend
     t = Table(title="2. Price / Volume Trend", expand=True)
     for col in ["1d", "7d", "30d", "24h Volume"]:
@@ -334,12 +413,22 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
     console.print(t)
 
     # 3. DIA-linked TVL proxy
+    if tvl.get("insufficient_history"):
+        change_line = (
+            f"Weekly / 30d change: [yellow]INSUFFICIENT DATA[/yellow] "
+            f"(need ≥{scoring.MIN_TREND_HISTORY_DAYS}d of history, "
+            f"have {tvl.get('history_days', 0):.0f}d — run daily)"
+        )
+    else:
+        change_line = (
+            f"Weekly change: {_pct(tvl['weekly_change'])}   "
+            f"30d change: {_pct(tvl['monthly_change'])}"
+        )
     console.print(
         Panel(
             f"Gross DIA-linked TVL proxy: [bold]{_money(tvl['gross_tvl'])}[/bold]   "
             f"Confidence-weighted: [bold]{_money(tvl['confidence_weighted_tvl'])}[/bold]\n"
-            f"Weekly change: {_pct(tvl['weekly_change'])}   "
-            f"30d change: {_pct(tvl['monthly_change'])}   "
+            f"{change_line}   "
             f"Resolved {tvl['n_resolved']}/{tvl['n_protocols']} protocols",
             title="3. DIA-linked TVL Proxy  ⚠ PROXY — NOT official DIA TVS",
             border_style="yellow",
@@ -360,17 +449,68 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
             )
         console.print(pt)
 
-    # 4. New integrations / grants
+    # 3b. On-chain oracle activity (REAL usage signal, via public RPC)
+    oa = oracle_activity_block(db)
+    if oa.get("present"):
+        ot = Table(
+            title="3b. On-chain DIA Oracle Activity  ·  real usage signal (public RPC)",
+            expand=True,
+        )
+        for col in ["Chain", "Oracle", "Updates (window)", "Blocks scanned", "Status"]:
+            ot.add_column(col)
+        for c in oa["chains"]:
+            addr = (c["oracle_address"] or "")
+            short = (addr[:10] + "…") if len(addr) > 12 else addr
+            window = (
+                f"{c['from_block']}–{c['to_block']}"
+                if c.get("from_block") is not None and c.get("to_block") is not None
+                else "n/a"
+            )
+            if c.get("error"):
+                status = "[red]" + c["error"][:24] + "[/red]"
+                updates = "n/a"
+            else:
+                status = "[green]ok[/green]"
+                updates = f"{c['update_count']:,}" if c["update_count"] is not None else "n/a"
+            ot.add_row(c["chain"], short, updates, window, status)
+        console.print(ot)
+        console.print(
+            "[dim]0 updates can be legitimate — many legacy push-oracles are quiet under "
+            "DIA's Lasernet pull model. Add active production addresses in config/oracles.yaml.[/dim]"
+        )
+
+    # 4. New integrations / grants (+ funnel conversion analysis)
+    funnel = agg.get("grant_funnel", {})
+    fc = funnel.get("counts", {})
+    to_test = funnel.get("to_testnet_rate")
+    to_main = funnel.get("to_mainnet_rate")
     grants_lines = (
         f"Total grants: [bold]{gm['total']}[/bold]   Mainnet: {gm['mainnet']}   "
-        f"RWA: {gm['rwa']}   Chains: {gm['n_chains']}   New (30d): [bold]{gm['new_30d']}[/bold]"
+        f"RWA: {gm['rwa']}   Chains: {gm['n_chains']}   New (30d): [bold]{gm['new_30d']}[/bold]\n"
+        f"Funnel: announced {fc.get('announced',0)} → testnet {fc.get('testnet',0)} → "
+        f"mainnet {fc.get('mainnet',0)}"
+        + (f"  (inactive {fc['inactive']})" if fc.get("inactive") else "")
+        + "\n"
+        f"Conversion: reached-testnet "
+        f"{('%.0f%%' % (to_test*100)) if to_test is not None else 'n/a'}   "
+        f"to-mainnet [bold]{('%.0f%%' % (to_main*100)) if to_main is not None else 'n/a'}[/bold]"
     )
-    console.print(Panel(grants_lines, title="4. Grants & Adoption (manual: config/grants.yaml)", border_style="cyan"))
+    console.print(Panel(grants_lines, title="4. Grants & Adoption + Funnel (manual: config/grants.yaml)", border_style="cyan"))
     if gm["new_30d_items"]:
         for g in gm["new_30d_items"][:8]:
             console.print(
                 f"  • [green]NEW[/green] {g.get('date_added','?')} — {g.get('chain','?')} / "
                 f"{g.get('project','?')} ({g.get('status','?')}) {g.get('evidence_url','')}"
+            )
+    if funnel.get("stale"):
+        console.print(
+            f"  [yellow]⚠ {funnel['n_stale']} stale grant(s) >"
+            f"{funnel['stale_days']}d pre-mainnet:[/yellow]"
+        )
+        for s in funnel["stale"][:6]:
+            console.print(
+                f"    · {s['chain']} / {s['project']} — {s['status']}, "
+                f"{s['days']}d since {s['date_added']}"
             )
 
     # 5. RWA traction

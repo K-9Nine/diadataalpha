@@ -16,7 +16,15 @@ import sys
 from dotenv import load_dotenv
 from rich.console import Console
 
-from dia_alpha_monitor import coingecko, config_loader, defillama, dia_api, reporting
+from dia_alpha_monitor import (
+    coingecko,
+    config_loader,
+    defillama,
+    dia_api,
+    evm_oracle,
+    feed_activity,
+    reporting,
+)
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import DIA_COINGECKO_ID, today_str, utcnow
 
@@ -56,6 +64,34 @@ def cmd_run(args) -> int:
             f"assets={oracle.quoted_assets} sources={oracle.exchange_sources} "
             f"(active {oracle.active_scrapers}){partial}"
         )
+
+    # A3. Feed coverage by asset class (DIA's own API) -------------------
+    feeds = feed_activity.fetch_feed_activity(cache=db)
+    db.insert("feed_activity_snapshots", feeds.as_dict())
+    if feeds.error and feeds.total_feeds is None:
+        warnings.append(f"Feed activity fetch failed: {feeds.error}")
+        console.print(f"[yellow]Feed coverage: FAILED ({feeds.error})[/yellow]")
+    else:
+        console.print(
+            f"[green]Feed coverage: ok[/green] total={feeds.total_feeds} "
+            f"(crypto={feeds.crypto_feeds} rwa*={feeds.rwa_feeds}) "
+            f"chains={feeds.n_blockchains} active_sources={feeds.active_sources}"
+        )
+
+    # A4. On-chain oracle activity via public RPC (real usage signal) -----
+    oracle_chains, ocwarn = config_loader.load_oracles()
+    if ocwarn:
+        warnings.append(ocwarn)
+    if oracle_chains:
+        oa_snaps = evm_oracle.poll_all(oracle_chains, cache=db)
+        for s in oa_snaps:
+            db.insert("oracle_activity_snapshots", s.as_dict())
+            tag = (
+                f"[red]err[/red] {s.error}" if s.error
+                else f"[green]ok[/green] {s.update_count} updates "
+                     f"in {s.from_block}-{s.to_block}"
+            )
+            console.print(f"  ORACLE {s.chain:<10} {tag}")
 
     # B. DeFiLlama protocol TVL proxy ------------------------------------
     protocols, pwarn = config_loader.load_protocols()
@@ -155,6 +191,8 @@ def cmd_export(args) -> int:
     tables = [
         "market_snapshots",
         "dia_oracle_snapshots",
+        "feed_activity_snapshots",
+        "oracle_activity_snapshots",
         "tvl_snapshots",
         "tvl_proxy",
         "competitor_snapshots",

@@ -8,7 +8,19 @@ import os
 
 import pytest
 
-from dia_alpha_monitor import config_loader, defillama, dia_api, reporting
+from datetime import timedelta
+
+from dia_alpha_monitor import (
+    alerts,
+    config_loader,
+    defillama,
+    dia_api,
+    evm_oracle,
+    feed_activity,
+    grants as grant_analysis,
+    reporting,
+    scoring,
+)
 from dia_alpha_monitor.cli import main
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import TvlSnapshot, today_str, utcnow
@@ -144,6 +156,124 @@ def test_price_divergence_pct():
     assert dia_api.price_divergence_pct(None, 0.10) is None
     assert dia_api.price_divergence_pct(0.10, None) is None
     assert dia_api.price_divergence_pct(0.0, 0.10) is None
+
+
+def test_feed_activity_classifies_rwa_vs_crypto():
+    assets = [
+        {"Asset": {"Blockchain": "Ethereum"}},
+        {"Asset": {"Blockchain": "Base"}},
+        {"Asset": {"Blockchain": "Fiat"}},      # RWA marker
+        {"Asset": {"Blockchain": "Stocks"}},    # RWA marker
+    ]
+    c = feed_activity.classify_assets(assets)
+    assert c["total_feeds"] == 4
+    assert c["rwa_feeds"] == 2
+    assert c["crypto_feeds"] == 2
+    assert c["n_blockchains"] == 4
+
+
+def test_evm_oracle_counts_logs(monkeypatch):
+    def fake_post(url, payload, **kwargs):
+        if payload["method"] == "eth_blockNumber":
+            return {"result": hex(100)}, ""
+        if payload["method"] == "eth_getLogs":
+            return {"result": [{}, {}, {}]}, ""  # 3 update logs
+        return {"result": None}, ""
+
+    monkeypatch.setattr(evm_oracle, "post_json", fake_post)
+    snap = evm_oracle.poll_oracle(
+        {"name": "X", "rpc_url": "http://x", "oracle_address": "0xabc", "lookback_blocks": 50}
+    )
+    assert snap.update_count == 3
+    assert snap.latest_block == 100
+    assert snap.from_block == 50 and snap.to_block == 100
+    assert snap.error == ""
+
+
+def test_evm_oracle_shrinks_window_on_range_error(monkeypatch):
+    calls = {"getLogs": 0}
+
+    def fake_post(url, payload, **kwargs):
+        if payload["method"] == "eth_blockNumber":
+            return {"result": hex(10000)}, ""
+        if payload["method"] == "eth_getLogs":
+            calls["getLogs"] += 1
+            if calls["getLogs"] == 1:
+                return {"error": {"message": "block range is too wide (maximum 1024)"}}, ""
+            return {"result": [{}]}, ""
+        return {"result": None}, ""
+
+    monkeypatch.setattr(evm_oracle, "post_json", fake_post)
+    snap = evm_oracle.poll_oracle(
+        {"name": "Astar", "rpc_url": "http://a", "oracle_address": "0xabc", "lookback_blocks": 2000}
+    )
+    assert calls["getLogs"] == 2          # retried once with a smaller window
+    assert snap.update_count == 1
+    assert snap.from_block == 10000 - 1000  # window halved
+
+
+def test_evm_oracle_missing_config_is_graceful():
+    snap = evm_oracle.poll_oracle({"name": "Y"})  # no rpc/address
+    assert snap.update_count is None
+    assert "not configured" in snap.error
+
+
+def test_grant_funnel_rates_and_stale():
+    now = utcnow()
+    old = (now - timedelta(days=200)).strftime("%Y-%m-%d")
+    recent = (now - timedelta(days=10)).strftime("%Y-%m-%d")
+    grants = [
+        {"project": "A", "chain": "X", "status": "mainnet", "date_added": old},
+        {"project": "B", "chain": "Y", "status": "testnet", "date_added": old},     # stale
+        {"project": "C", "chain": "Z", "status": "announced", "date_added": recent},  # not stale
+        {"project": "D", "chain": "W", "status": "inactive", "date_added": old},
+    ]
+    f = grant_analysis.grant_funnel(grants, stale_days=90, now=now)
+    assert f["counts"] == {"announced": 1, "testnet": 1, "mainnet": 1, "inactive": 1}
+    assert f["to_mainnet_rate"] == 0.25            # 1/4 live
+    assert f["to_testnet_rate"] == 0.5             # testnet+mainnet = 2/4
+    assert f["n_stale"] == 1                        # only B (testnet, 200d old)
+    assert f["stale"][0]["project"] == "B"
+
+
+def test_tvl_growth_insufficient_history():
+    # With < 7 days of history, trend must read INSUFFICIENT DATA, not a score.
+    r = scoring.score_tvl_growth(0.0, 0.0, n_resolved=8, history_days=2)
+    assert r.get("insufficient") is True
+    assert "INSUFFICIENT DATA" in r["rationale"]
+    # With enough history, it scores normally.
+    r2 = scoring.score_tvl_growth(10.0, 20.0, n_resolved=8, history_days=14)
+    assert not r2.get("insufficient")
+
+
+def _insert_market(db, date, price):
+    db.insert("market_snapshots", {
+        "date": date, "ts": utcnow().isoformat(), "price": price,
+        "market_cap": 1, "volume_24h": 1, "circulating_supply": 1,
+        "total_supply": 1, "fdv": 1, "change_1d": 0, "change_7d": 0,
+        "change_30d": 0, "source": "t", "stale": 0,
+    })
+
+
+def test_alerts_fire_on_big_wow_move(tmp_path):
+    db = Database(str(tmp_path / "a.db"))
+    eight_ago = (utcnow() - timedelta(days=8)).strftime("%Y-%m-%d")
+    _insert_market(db, eight_ago, 0.10)
+    _insert_market(db, today_str(), 0.13)   # +30% WoW
+    fired = alerts.week_over_week_alerts(db, threshold=10.0)
+    db.close()
+    metrics = {a["metric"]: a for a in fired}
+    assert "DIA price" in metrics
+    assert metrics["DIA price"]["direction"] == "up"
+    assert metrics["DIA price"]["pct"] > 10
+
+
+def test_alerts_suppressed_without_history(tmp_path):
+    db = Database(str(tmp_path / "b.db"))
+    _insert_market(db, today_str(), 0.10)   # single day -> span 0
+    fired = alerts.week_over_week_alerts(db, threshold=10.0)
+    db.close()
+    assert fired == []
 
 
 def test_config_loaders_return_lists():

@@ -80,3 +80,37 @@ def get_json(
         except Exception:
             pass
     return None, last_err
+
+
+def post_json(
+    url: str,
+    payload: dict[str, Any],
+    *,
+    timeout: float = DEFAULT_TIMEOUT,
+    retries: int = DEFAULT_RETRIES,
+) -> tuple[Optional[Any], str]:
+    """POST JSON and return ``(data, error)`` — used for JSON-RPC calls.
+
+    Same graceful contract as :func:`get_json`: never raises for network/HTTP
+    issues; on failure ``data`` is ``None`` and ``error`` is populated.
+    """
+    last_err = ""
+    for attempt in range(1, retries + 1):
+        try:
+            headers = {"User-Agent": _USER_AGENT, "Content-Type": "application/json"}
+            resp = httpx.post(url, json=payload, timeout=timeout, headers=headers)
+            if resp.status_code == 429:
+                last_err = "HTTP 429 rate limited"
+                time.sleep(BACKOFF_BASE**attempt)
+                continue
+            resp.raise_for_status()
+            return resp.json(), ""
+        except (httpx.HTTPError, ValueError) as exc:
+            last_err = f"{type(exc).__name__}: {exc}"
+            if attempt < retries:
+                time.sleep(BACKOFF_BASE**attempt)
+        except Exception as exc:  # pragma: no cover - defensive catch-all
+            last_err = f"{type(exc).__name__}: {exc}"
+            if attempt < retries:
+                time.sleep(BACKOFF_BASE**attempt)
+    return None, last_err

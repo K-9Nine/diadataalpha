@@ -63,6 +63,12 @@ def load_staking() -> tuple[list[dict], str]:
     return list(items or []), warn
 
 
+def load_oracles() -> tuple[list[dict], str]:
+    data, warn = _load_yaml("oracles.yaml")
+    items = (data or {}).get("chains", []) if isinstance(data, dict) else (data or [])
+    return list(items or []), warn
+
+
 # -- derived metrics -------------------------------------------------------
 
 def _parse_date(value: Any) -> datetime | None:

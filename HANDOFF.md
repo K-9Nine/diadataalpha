@@ -6,9 +6,10 @@
 - **What it is:** a local Python tool that collects DIA Data / DIA Oracles
   signals (market, DIA-linked TVL proxy, grants, RWA news, staking, competitors)
   into SQLite and prints a transparent 0–100 "alpha score" + investor report.
-- **Status:** v1 is **built, tested (33 passing), committed, and pushed.**
-  Live APIs are **validated**; DIA's own API (`dia_api.py`) is wired in as a
-  primary, signed source — see "Live validation" and the trusted-sources note.
+- **Status:** **built, tested (41 passing), committed, and pushed.** v1 + v2.
+  Live APIs validated; DIA's own API (`dia_api.py`) is a primary signed source.
+  v2 added: feed-coverage tracker, on-chain oracle polling, grant funnel,
+  ≥7-day trend gating, and a week-over-week [ALERT] banner.
 - **Branch:** PR #1 (`claude/dia-alpha-monitor-build-8p1br6`) is **merged into
   `main`**. Current work continues on `claude/friendly-hawking-2tu1jf`.
 - **Repo:** `K-9Nine/diadataalpha` (this is the target repo; `answergraph3` is unrelated).
@@ -70,6 +71,10 @@ dia_alpha_monitor/
   coingecko.py    # DIA market + competitors (free /coins/markets)
   dia_api.py      # DIA's OWN API (api.diadata.org): signed self-price + coverage
                   #   (quoted assets / exchange sources) + price-divergence check
+  feed_activity.py# daily feed-coverage snapshot + RWA-vs-crypto split (v2)
+  evm_oracle.py   # on-chain oracle update polling via public RPC (v2)
+  grants.py       # grant funnel: conversion rates + stale-grant flags (v2)
+  alerts.py       # week-over-week >10% movement [ALERT]s (v2)
   defillama.py    # per-protocol AND per-chain (kind: chain) TVL + compute_proxy()
   config_loader.py# loads config/*.yaml + derives grants/news/staking metrics
   scoring.py      # transparent 0–100 score; CATEGORY_MAX weights; NEUTRAL_FRACTION
@@ -121,8 +126,15 @@ Key design rules to preserve:
       first live run self-diagnosing.
 - [x] CI workflow running `pytest` (`.github/workflows/ci.yml`, uv, py3.11+3.12,
       offline tests) — added 2026-06-12.
-- [ ] v2 ideas: RSS auto-ingest for the news tracker; an on-chain collector for
-      *actual* DIA oracle reads/fees (the real usage signal behind the proxy).
+- [~] v2 on-chain usage collector: DONE as `evm_oracle.py` (config-driven log
+      polling). NEXT: populate `config/oracles.yaml` with verified ACTIVE
+      production oracle/adapter addresses (e.g. Parallel's AggregatorV3 adapters
+      on Base/Sonic/Avalanche/HyperEVM) — the seeded legacy addresses are quiet.
+- [ ] v2 ideas remaining: RSS auto-ingest for the news tracker; richer RWA feed
+      classification if DIA exposes an asset-class endpoint (REST is currently
+      crypto-token-centric, so `feed_activity.rwa_feeds` is a floor).
+- [ ] Feed DIA-API/feed-coverage signals into the 0–100 score (currently shown
+      but not scored — would need a deliberate weight rebalance).
 
 ## Conventions
 - PR #1 is merged into `main`. Develop on `claude/friendly-hawking-2tu1jf`.

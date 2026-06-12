@@ -27,6 +27,16 @@ for that.
   (number of assets quoted, exchange sources, and active scrapers). The report
   cross-checks DIA's self-price against the CoinGecko market price as a
   **data-integrity** signal (a large divergence is a red flag).
+- **Feed-coverage tracker** (`api.diadata.org`): total feeds, a best-effort
+  RWA-vs-crypto split, blockchains covered, and active exchange sources —
+  snapshotted daily so coverage *growth* becomes a signal.
+- **On-chain oracle activity** (public EVM RPC, no key): polls the DIA oracle
+  contract on each chain in `config/oracles.yaml` for update logs over a recent
+  block window — a **direct on-chain usage** signal (vs the TVL *proxy*).
+- **Grant funnel analysis**: announced → testnet → mainnet conversion rates,
+  plus a flag for **stale grants** stuck pre-mainnet for >90 days.
+- **[ALERT] banner**: any tracked metric moving **>10% week-over-week** is
+  surfaced at the top of the report (suppressed until ≥7 days of history).
 - **DIA-linked TVL proxy** (DeFiLlama, free): TVL of a configurable watchlist of
   protocols believed to use DIA oracles, with manual `dia_role` / `confidence` /
   `evidence_url`. Produces a gross proxy and a **confidence-weighted** proxy,
@@ -124,6 +134,7 @@ APIs in use (CoinGecko, DeFiLlama). No third-party news/aggregators.
 | `grants.yaml` | Oracle Grants / adoption | `chain`, `status`, `product`, `RWA`, `evidence_url` |
 | `news.yaml` | RWA / narrative items | `category`, `impact_score` (1-5), `url` |
 | `staking_snapshots.yaml` | Manual staking/Lasernet log | `total_dia_staked`, `feeders`, `apy`, `lasernet_tx_count` |
+| `oracles.yaml` | EVM oracle-activity watchlist | `rpc_url`, `oracle_address`, `lookback_blocks` |
 
 **To verify a protocol's TVL slug:** open `https://defillama.com/protocol/<slug>`.
 A wrong slug shows as an error on that row in the report; fix it in the YAML.
@@ -140,7 +151,8 @@ python -m dia_alpha_monitor export            # -> ./exports/*.csv
 python -m dia_alpha_monitor export --out /tmp # custom directory
 ```
 
-One CSV per table: `market_snapshots`, `dia_oracle_snapshots`, `tvl_snapshots`,
+One CSV per table: `market_snapshots`, `dia_oracle_snapshots`,
+`feed_activity_snapshots`, `oracle_activity_snapshots`, `tvl_snapshots`,
 `tvl_proxy`, `competitor_snapshots`, `staking_snapshots`, `score_snapshots`.
 
 ---
@@ -190,8 +202,11 @@ RedStone market cap.
   add new items over time (e.g. staking APY recalibrates after 2026-07-01).
 - **CoinGecko / DeFiLlama free endpoints** can rate-limit or change ids/slugs.
   Failures are recorded, not fatal. Stale market data is flagged `(STALE)`.
-- **No paid APIs** are used in v1. No on-chain indexing of actual DIA oracle
-  reads/fees yet - that's the obvious v2.
+- **No paid APIs** are used. On-chain oracle polling (`evm_oracle.py`) reads
+  public RPCs for oracle *update logs* — but DIA's newer Lasernet pull model
+  means many legacy push-oracle contracts are quiet, so a `0` count is a real
+  reading, not a bug. Add verified **active** production oracle/adapter
+  addresses to `config/oracles.yaml` to capture meaningful usage.
 - This is a **research aid, not advice.** Do your own verification.
 
 ---
@@ -207,7 +222,8 @@ dia-alpha-monitor/
     protocols.yaml  grants.yaml  news.yaml  staking_snapshots.yaml  competitors.yaml
   dia_alpha_monitor/
     __init__.py  __main__.py  cli.py  db.py  http_client.py
-    coingecko.py  dia_api.py  defillama.py  config_loader.py
+    coingecko.py  dia_api.py  feed_activity.py  defillama.py
+    evm_oracle.py  grants.py  alerts.py  config_loader.py
     scoring.py  reporting.py  valuation.py  models.py
   dashboard.py       # optional Streamlit app
   exports/           # CSV output
@@ -220,8 +236,9 @@ dia-alpha-monitor/
 python -m pytest
 ```
 
-Covers the valuation maths, the scoring model, config loading, the TVL-proxy
-aggregation (incl. chain-vs-protocol routing and per-slug report dedup), the
-DIA-API collector (parsing, partial-failure resilience, price divergence),
-graceful handling of missing configs, and the CSV export command. No network
-access is required to run the tests.
+Covers the valuation maths, the scoring model (incl. the ≥7-day trend gate),
+config loading, the TVL-proxy aggregation (chain-vs-protocol routing, per-slug
+dedup), the DIA-API + feed-coverage collectors, the EVM oracle poller (log
+counting + range-limit retry), the grant funnel, the week-over-week alerts,
+graceful handling of missing configs, and the CSV export. No network access is
+required to run the tests.

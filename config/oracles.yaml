@@ -1,0 +1,34 @@
+# EVM oracle-activity watchlist (for evm_oracle.py).
+#
+# For each configured chain the tool polls a public RPC for logs emitted by the
+# DIA oracle contract over a recent block window, and counts them as on-chain
+# oracle updates — a DIRECT usage signal (vs the TVL *proxy*).
+#
+# Fields per chain:
+#   name           : label (ideally a chain that also appears in protocols.yaml)
+#   rpc_url        : a public JSON-RPC endpoint (no key needed)
+#   oracle_address : the DIA oracle contract on that chain
+#   lookback_blocks: how many blocks back to scan. MUST respect the RPC's
+#                    eth_getLogs range cap (e.g. Astar caps at 1024). The poller
+#                    auto-halves and retries once on a "range too wide" error.
+#   notes          : provenance / caveats
+#
+# IMPORTANT — honesty note: DIA's newer Lasernet/Lumina pull model means many
+# legacy per-chain *push* oracle contracts update rarely or not at all, so a
+# count of 0 is a real reading, not an error. To capture meaningful usage, add
+# the ACTIVE production oracle/adapter addresses for your watchlist integrations
+# (e.g. the Parallel AggregatorV3 adapters on Base/Sonic/Avalanche/HyperEVM)
+# once you've verified them on the chain's explorer.
+
+chains:
+  - name: Ethereum
+    rpc_url: "https://ethereum-rpc.publicnode.com"
+    oracle_address: "0xa93546947f3015c986695750b8bbEa8e26D65856"
+    lookback_blocks: 2000
+    notes: "DIA demo/legacy oracle from the docs (testing contract). Likely quiet — replace with a production address for real signal."
+
+  - name: Astar
+    rpc_url: "https://evm.astar.network"
+    oracle_address: "0xd79357ebb0cd724e391f2b49a8De0E31688fEc75"
+    lookback_blocks: 1000
+    notes: "DIA canonical oracle on Astar (docs.astar.network). Astar RPC caps eth_getLogs at 1024 blocks."
