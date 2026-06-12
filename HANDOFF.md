@@ -6,58 +6,57 @@
 - **What it is:** a local Python tool that collects DIA Data / DIA Oracles
   signals (market, DIA-linked TVL proxy, grants, RWA news, staking, competitors)
   into SQLite and prints a transparent 0–100 "alpha score" + investor report.
-- **Status:** v1 is **built, tested (27 passing), committed, and pushed.**
-- **Branch:** `claude/dia-alpha-monitor-build-8p1br6`
-- **PR:** `K-9Nine/diadataalpha#1` — push to the branch to update it. Do **not**
-  open a new PR.
+- **Status:** v1 is **built, tested (30 passing), committed, and pushed.**
+  Live APIs are now **validated** — see "Live validation" below.
+- **Branch:** PR #1 (`claude/dia-alpha-monitor-build-8p1br6`) is **merged into
+  `main`**. Current work continues on `claude/friendly-hawking-2tu1jf`.
 - **Repo:** `K-9Nine/diadataalpha` (this is the target repo; `answergraph3` is unrelated).
 
-## The one open blocker
-Live API data was **never validated against the real endpoints** because the
-previous session's network egress proxy blocked all outbound hosts
-(`Host not in allowlist`, even `example.com`). The user has since opened full
-internet access, BUT **egress policy is applied at container start**, so it only
-takes effect in a **new session**. You are (hopefully) that new session.
+## The one open blocker — RESOLVED ✅
+Live API data is now validated against the real endpoints. As of 2026-06-12 a
+fresh session had full egress: CoinGecko `/ping` → 200, DeFiLlama `/protocols`
+→ 200. `run` populates **8/8 TVL rows** and **4/5 competitors** (Chronicle has
+no liquid token by design). If a future session loses connectivity, the symptom
+is `403 Host not in allowlist`; that means the open-internet policy hasn't
+applied (it only takes effect in a newly-started session).
 
-### First thing to do in the new session
+### Quick start in a new session
 ```bash
 cd diadataalpha
 uv venv && source .venv/bin/activate
 uv pip install -e '.[dev]'
-python -m dia_alpha_monitor run        # should now hit live APIs
+python -m dia_alpha_monitor run        # hits live APIs
 python -m dia_alpha_monitor report
-python -m pytest                       # expect 27 passed
+python -m pytest                       # expect 30 passed
 ```
-Confirm connectivity quickly if unsure:
-```bash
-python -c "import httpx;print(httpx.get('https://api.coingecko.com/api/v3/ping',timeout=15).status_code)"
-```
-If you still get `403 Host not in allowlist`, the policy hasn't applied — tell
-the user the environment still needs the open-internet policy and that it only
-applies to newly-started sessions.
 
-## Validation tasks once live data flows
-These are best-guess identifiers I could not verify without network. On the
-first live `run`, check the per-row status in the report and fix any that error:
+## Live validation (done 2026-06-12)
+All best-guess identifiers were checked against the live APIs and corrected:
 
-1. **DIA CoinGecko id** = `dia-data` (in `dia_alpha_monitor/models.py`,
-   `DIA_COINGECKO_ID`). If the market row is empty/STALE, the id is wrong —
-   find the right one via `https://api.coingecko.com/api/v3/coins/list`.
-2. **Competitor `coingecko_id`s** in `config/competitors.yaml` — especially
-   `redstone-oracles` (uncertain). An empty markets row = wrong id. Chronicle
-   intentionally has no token (`coingecko_id: null`) and shows as a data gap.
-3. **DeFiLlama slugs** in `config/protocols.yaml` — `silo-finance`,
-   `zest-protocol`, `parallel`, `plume`, `somnia`, `hydration` are guesses.
-   A wrong slug shows as a per-row error (does NOT crash). Verify each at
-   `https://defillama.com/protocol/<slug>` and correct the YAML.
+1. **DIA CoinGecko id** = `dia-data` — **confirmed correct** (price ≈ $0.124,
+   mcap ≈ $14.9M). In `models.py` `DIA_COINGECKO_ID`.
+2. **Competitor `coingecko_id`s** (`config/competitors.yaml`) — all resolve,
+   including `redstone-oracles` (previously uncertain — **confirmed**).
+   Chronicle has `coingecko_id: null` and shows as a data gap by design.
+3. **DeFiLlama slugs** (`config/protocols.yaml`) — corrected:
+   - `parallel` → `parallel-protocol-v3` (the live CDP stablecoin protocol).
+   - `zest-protocol` → `zest-v2` (`zest-protocol`/v1 is dead, reports TVL 0).
+   - `plume` / `somnia` were never protocols — they are **chains**. Added a
+     `kind: chain` field; chain entries fetch `/v2/historicalChainTvl/{name}`
+     (slug = chain name, e.g. `Plume Mainnet`, `Somnia`). See `defillama.py`
+     `_fetch_chain_tvl`.
+   - `morpho`, `euler`, `silo-finance`, `hydration` confirmed correct.
 
-After fixing ids/slugs, re-run `run` and the report should populate fully.
+Also fixed a reporting bug: re-running on the same day appended duplicate rows
+to the TVL/competitor tables because the report selected *all* rows for the
+date. `reporting.py` now keeps the newest row per slug (`MAX(id) GROUP BY slug`).
 
 ## What works today (verified locally, no network)
 - `run` / `report` / `export` all work and **never crash on a failed source**
   (failures are recorded in the report + `raw_cache` table).
-- Valuation maths, scoring model, config loading, TVL-proxy aggregation, and CSV
-  export are covered by **27 passing pytest tests** (no network needed).
+- Valuation maths, scoring model, config loading, TVL-proxy aggregation, the
+  chain-vs-protocol TVL routing, per-slug report dedup, and CSV export are
+  covered by **30 passing pytest tests** (no network needed).
 - Full report rendering confirmed with seeded data (all 10 sections, absolute +
   relative valuation scenarios, score breakdown).
 
@@ -67,7 +66,7 @@ dia_alpha_monitor/
   cli.py          # argparse: run / report / export; orchestrates collection
   http_client.py  # the ONLY network path: timeout + retry + graceful failure + cache
   coingecko.py    # DIA market + competitors (free /coins/markets)
-  defillama.py    # per-protocol TVL + compute_proxy() (gross + confidence-weighted)
+  defillama.py    # per-protocol AND per-chain (kind: chain) TVL + compute_proxy()
   config_loader.py# loads config/*.yaml + derives grants/news/staking metrics
   scoring.py      # transparent 0–100 score; CATEGORY_MAX weights; NEUTRAL_FRACTION
   valuation.py    # pure functions: market-cap + relative scenarios (unit-tested)
@@ -87,19 +86,21 @@ Key design rules to preserve:
 - Personal position (500,000 DIA @ ~$0.18, staked) lives in `models.py`.
 - Everything is **research signals, not financial advice.**
 
-## Suggested next steps (not yet done)
-- [ ] Run live, fix any wrong CoinGecko ids / DeFiLlama slugs (see above).
+## Suggested next steps
+- [x] Run live, fix wrong CoinGecko ids / DeFiLlama slugs (done 2026-06-12).
 - [ ] Replace the `EXAMPLE` placeholder rows in `config/grants.yaml`,
-      `news.yaml`, `staking_snapshots.yaml` with verified entries.
+      `news.yaml`, `staking_snapshots.yaml` with verified entries. **This is now
+      the main remaining data-quality task** — these are still placeholders.
+- [ ] Set real `dia_role` / `confidence` / `evidence_url` per watchlist protocol
+      once DIA-usage is confirmed (all are currently `unknown`/`low`).
 - [ ] (Optional) Add a `doctor` subcommand: ping both APIs + resolve every
       configured id/slug and print a "resolved vs failed" table — makes the
       first live run self-diagnosing.
-- [ ] (Optional, offered) Subscribe to PR #1 activity to autofix CI / respond to
-      review comments. Add a CI workflow that runs `pytest` first.
+- [ ] (Optional) Add a CI workflow that runs `pytest`.
 - [ ] v2 ideas: RSS auto-ingest for the news tracker; an on-chain collector for
       *actual* DIA oracle reads/fees (the real usage signal behind the proxy).
 
 ## Conventions
-- Develop on `claude/dia-alpha-monitor-build-8p1br6`; push updates PR #1.
-- `git push -u origin claude/dia-alpha-monitor-build-8p1br6` (retry w/ backoff on
+- PR #1 is merged into `main`. Develop on `claude/friendly-hawking-2tu1jf`.
+- `git push -u origin claude/friendly-hawking-2tu1jf` (retry w/ backoff on
   network errors). Do not push to other branches. Do not open a new PR.

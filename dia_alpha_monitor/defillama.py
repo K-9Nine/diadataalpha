@@ -38,8 +38,36 @@ def _extract_chain_tvls(payload: dict) -> dict[str, float]:
     return out
 
 
+def _fetch_chain_tvl(slug: str, snap: TvlSnapshot, cache=None) -> TvlSnapshot:
+    """Fetch chain-level TVL for an "ecosystem" entry.
+
+    Chains are not addressable via ``/protocol/{slug}`` (that 400s). We use
+    ``/v2/historicalChainTvl/{chain}`` and take the latest point. ``slug`` here
+    is the DeFiLlama chain name, e.g. ``Plume Mainnet`` or ``Somnia``.
+    """
+    data, err = get_json(
+        f"{BASE}/v2/historicalChainTvl/{slug}",
+        cache=cache,
+        cache_source="defillama",
+        cache_key=f"chain:{slug}",
+    )
+    if err or not data:
+        snap.error = err or "no data"
+        return snap
+    if isinstance(data, list) and data and isinstance(data[-1], dict):
+        snap.tvl = round(float(data[-1].get("tvl", 0.0)), 2)
+        snap.chain_tvls_json = json.dumps({slug: snap.tvl})
+    else:
+        snap.error = "unexpected chain payload"
+    return snap
+
+
 def fetch_protocol_tvl(protocol: dict, cache=None) -> TvlSnapshot:
-    """Fetch one protocol's TVL. ``protocol`` is an entry from protocols.yaml."""
+    """Fetch one protocol's TVL. ``protocol`` is an entry from protocols.yaml.
+
+    ``kind: chain`` entries are fetched via the chain TVL endpoint; everything
+    else (the default ``protocol``) via ``/protocol/{slug}``.
+    """
     slug = protocol.get("slug", "")
     snap = TvlSnapshot(
         date=today_str(),
@@ -52,6 +80,9 @@ def fetch_protocol_tvl(protocol: dict, cache=None) -> TvlSnapshot:
     if not slug:
         snap.error = "no slug configured"
         return snap
+
+    if protocol.get("kind") == "chain":
+        return _fetch_chain_tvl(slug, snap, cache=cache)
 
     data, err = get_json(
         f"{BASE}/protocol/{slug}",

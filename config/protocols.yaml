@@ -12,6 +12,9 @@
 #   confidence  : high | medium | low   (drives the confidence-weighted proxy)
 #   evidence_url: link proving DIA usage (docs/integration/announcement)
 #   notes       : free text
+#   kind        : protocol (default) | chain. For "chain" entries the slug is
+#                 the DeFiLlama chain NAME (e.g. "Plume Mainnet") and TVL is
+#                 read from /v2/historicalChainTvl, not /protocol.
 #
 # Confidence weights: high=1.0, medium=0.5, low=0.2 (see defillama.py).
 # Slugs are best-effort guesses — a wrong slug fails gracefully and is shown
@@ -47,29 +50,31 @@ protocols:
     notes: "Watchlist (Polkadot/HydraDX). VERIFY DIA usage."
 
   - name: Zest Protocol
-    slug: zest-protocol
+    slug: zest-v2
     dia_role: unknown
     confidence: low
     evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist (Bitcoin/Stacks). VERIFY DIA usage."
+    notes: "Watchlist (Bitcoin/Stacks). Resolved to zest-v2 (zest-protocol/v1 is dead, TVL 0). VERIFY DIA usage."
 
   - name: Parallel
-    slug: parallel
+    slug: parallel-protocol-v3
     dia_role: unknown
     confidence: low
     evidence_url: "https://docs.diadata.org/"
-    notes: "Watchlist. Slug may be ambiguous — confirm on DeFiLlama."
+    notes: "Watchlist. Resolved to parallel-protocol-v3 (CDP stablecoin). VERIFY DIA usage."
 
   - name: Plume (ecosystem)
-    slug: plume
+    slug: Plume Mainnet
+    kind: chain
     dia_role: grant_recipient
     confidence: low
     evidence_url: "https://docs.diadata.org/"
-    notes: "RWA chain ecosystem. Slug may differ — confirm on DeFiLlama."
+    notes: "RWA chain ecosystem. Chain-level TVL via /v2/historicalChainTvl."
 
   - name: Somnia (ecosystem)
-    slug: somnia
+    slug: Somnia
+    kind: chain
     dia_role: grant_recipient
     confidence: low
     evidence_url: "https://docs.diadata.org/"
-    notes: "Ecosystem watchlist. Slug may not exist on DeFiLlama yet."
+    notes: "Ecosystem watchlist. Chain-level TVL via /v2/historicalChainTvl."
