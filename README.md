@@ -22,6 +22,11 @@ for that.
 
 - **Market data** (CoinGecko, free): DIA price, market cap, volume, supply, FDV,
   1d/7d/30d change, volume/market-cap ratio. Daily snapshots in SQLite.
+- **DIA's own API** (`api.diadata.org`, free, no key): DIA's **signed**
+  self-reported price for the DIA token, plus primary-source **coverage**
+  (number of assets quoted, exchange sources, and active scrapers). The report
+  cross-checks DIA's self-price against the CoinGecko market price as a
+  **data-integrity** signal (a large divergence is a red flag).
 - **DIA-linked TVL proxy** (DeFiLlama, free): TVL of a configurable watchlist of
   protocols believed to use DIA oracles, with manual `dia_role` / `confidence` /
   `evidence_url`. Produces a gross proxy and a **confidence-weighted** proxy,
@@ -103,9 +108,14 @@ else continues.
 
 ## Edit the configs
 
-All manual inputs live in `config/*.yaml`. They ship with **clearly-labelled
-EXAMPLE placeholders** so the report renders out of the box - replace them with
-verified entries.
+All manual inputs live in `config/*.yaml`. They ship pre-populated with
+**verified, source-linked entries** (researched 2026-06-12) — every row carries
+an `evidence_url`/`source`. Keep them current as DIA ships new grants/news.
+
+**Trusted-sources policy:** every `evidence_url`/`source` must be a *fully
+trusted* source — DIA's own properties (`diadata.org`, `docs.diadata.org`,
+`forum.diadata.org`, `api.diadata.org`, DIA GitHub) or the canonical free data
+APIs in use (CoinGecko, DeFiLlama). No third-party news/aggregators.
 
 | File | Purpose | Key fields |
 |------|---------|-----------|
@@ -130,8 +140,8 @@ python -m dia_alpha_monitor export            # -> ./exports/*.csv
 python -m dia_alpha_monitor export --out /tmp # custom directory
 ```
 
-One CSV per table: `market_snapshots`, `tvl_snapshots`, `tvl_proxy`,
-`competitor_snapshots`, `staking_snapshots`, `score_snapshots`.
+One CSV per table: `market_snapshots`, `dia_oracle_snapshots`, `tvl_snapshots`,
+`tvl_proxy`, `competitor_snapshots`, `staking_snapshots`, `score_snapshots`.
 
 ---
 
@@ -174,8 +184,10 @@ RedStone market cap.
 - **The "DIA-linked TVL proxy" is NOT official DIA TVS.** It is the TVL of
   protocols *we put on a watchlist*. Until you verify each `dia_role` /
   `confidence` against real evidence, treat it as a hypothesis, not a fact.
-- **Manual files can be stale or wrong.** Grants, news and staking are
-  hand-entered; the shipped rows are placeholders.
+- **Manual files can go stale.** Grants, news and staking are hand-entered.
+  The shipped rows are verified and source-linked as of the research date, but
+  they are a point-in-time snapshot — re-check against the linked sources and
+  add new items over time (e.g. staking APY recalibrates after 2026-07-01).
 - **CoinGecko / DeFiLlama free endpoints** can rate-limit or change ids/slugs.
   Failures are recorded, not fatal. Stale market data is flagged `(STALE)`.
 - **No paid APIs** are used in v1. No on-chain indexing of actual DIA oracle
@@ -195,7 +207,7 @@ dia-alpha-monitor/
     protocols.yaml  grants.yaml  news.yaml  staking_snapshots.yaml  competitors.yaml
   dia_alpha_monitor/
     __init__.py  __main__.py  cli.py  db.py  http_client.py
-    coingecko.py  defillama.py  config_loader.py
+    coingecko.py  dia_api.py  defillama.py  config_loader.py
     scoring.py  reporting.py  valuation.py  models.py
   dashboard.py       # optional Streamlit app
   exports/           # CSV output
@@ -209,5 +221,7 @@ python -m pytest
 ```
 
 Covers the valuation maths, the scoring model, config loading, the TVL-proxy
-aggregation, graceful handling of missing configs, and the CSV export command.
-No network access is required to run the tests.
+aggregation (incl. chain-vs-protocol routing and per-slug report dedup), the
+DIA-API collector (parsing, partial-failure resilience, price divergence),
+graceful handling of missing configs, and the CSV export command. No network
+access is required to run the tests.

@@ -6,8 +6,9 @@
 - **What it is:** a local Python tool that collects DIA Data / DIA Oracles
   signals (market, DIA-linked TVL proxy, grants, RWA news, staking, competitors)
   into SQLite and prints a transparent 0–100 "alpha score" + investor report.
-- **Status:** v1 is **built, tested (30 passing), committed, and pushed.**
-  Live APIs are now **validated** — see "Live validation" below.
+- **Status:** v1 is **built, tested (33 passing), committed, and pushed.**
+  Live APIs are **validated**; DIA's own API (`dia_api.py`) is wired in as a
+  primary, signed source — see "Live validation" and the trusted-sources note.
 - **Branch:** PR #1 (`claude/dia-alpha-monitor-build-8p1br6`) is **merged into
   `main`**. Current work continues on `claude/friendly-hawking-2tu1jf`.
 - **Repo:** `K-9Nine/diadataalpha` (this is the target repo; `answergraph3` is unrelated).
@@ -55,8 +56,9 @@ date. `reporting.py` now keeps the newest row per slug (`MAX(id) GROUP BY slug`)
 - `run` / `report` / `export` all work and **never crash on a failed source**
   (failures are recorded in the report + `raw_cache` table).
 - Valuation maths, scoring model, config loading, TVL-proxy aggregation, the
-  chain-vs-protocol TVL routing, per-slug report dedup, and CSV export are
-  covered by **30 passing pytest tests** (no network needed).
+  chain-vs-protocol TVL routing, per-slug report dedup, the DIA-API collector
+  (parsing + partial-failure + price-divergence), and CSV export are covered by
+  **33 passing pytest tests** (no network needed).
 - Full report rendering confirmed with seeded data (all 10 sections, absolute +
   relative valuation scenarios, score breakdown).
 
@@ -66,6 +68,8 @@ dia_alpha_monitor/
   cli.py          # argparse: run / report / export; orchestrates collection
   http_client.py  # the ONLY network path: timeout + retry + graceful failure + cache
   coingecko.py    # DIA market + competitors (free /coins/markets)
+  dia_api.py      # DIA's OWN API (api.diadata.org): signed self-price + coverage
+                  #   (quoted assets / exchange sources) + price-divergence check
   defillama.py    # per-protocol AND per-chain (kind: chain) TVL + compute_proxy()
   config_loader.py# loads config/*.yaml + derives grants/news/staking metrics
   scoring.py      # transparent 0–100 score; CATEGORY_MAX weights; NEUTRAL_FRACTION
@@ -85,6 +89,14 @@ Key design rules to preserve:
   not zero, so the headline number isn't dominated by empty manual files.
 - Personal position (500,000 DIA @ ~$0.18, staked) lives in `models.py`.
 - Everything is **research signals, not financial advice.**
+- **Trusted-sources policy (added 2026-06-12):** every config `evidence_url`
+  and `source` must be a *fully trusted* source — DIA's own properties
+  (`diadata.org`, `docs.diadata.org`, `forum.diadata.org`, `api.diadata.org`,
+  DIA GitHub) or the canonical free data APIs already used (CoinGecko,
+  DeFiLlama). No third-party news/aggregators (CoinMarketCap, crypto news
+  blogs, Medium). `dia_api.py` is the embodiment of this — DIA's own signed
+  data. Report section "1b" cross-checks DIA's self-price vs CoinGecko as a
+  data-integrity signal (currently ~0.2% divergence — sources agree).
 
 ## Suggested next steps
 - [x] Run live, fix wrong CoinGecko ids / DeFiLlama slugs (done 2026-06-12).
@@ -107,7 +119,8 @@ Key design rules to preserve:
 - [ ] (Optional) Add a `doctor` subcommand: ping both APIs + resolve every
       configured id/slug and print a "resolved vs failed" table — makes the
       first live run self-diagnosing.
-- [ ] (Optional) Add a CI workflow that runs `pytest`.
+- [x] CI workflow running `pytest` (`.github/workflows/ci.yml`, uv, py3.11+3.12,
+      offline tests) — added 2026-06-12.
 - [ ] v2 ideas: RSS auto-ingest for the news tracker; an on-chain collector for
       *actual* DIA oracle reads/fees (the real usage signal behind the proxy).
 

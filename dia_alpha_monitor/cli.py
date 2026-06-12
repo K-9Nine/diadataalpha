@@ -16,7 +16,7 @@ import sys
 from dotenv import load_dotenv
 from rich.console import Console
 
-from dia_alpha_monitor import coingecko, config_loader, defillama, reporting
+from dia_alpha_monitor import coingecko, config_loader, defillama, dia_api, reporting
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import DIA_COINGECKO_ID, today_str, utcnow
 
@@ -42,6 +42,20 @@ def cmd_run(args) -> int:
     else:
         console.print(f"[green]Market: ok[/green] price={market.price} mcap={market.market_cap}")
     db.insert("market_snapshots", market.as_dict())
+
+    # A2. DIA's own API (primary source: signed self-price + coverage) ----
+    oracle = dia_api.fetch_dia_oracle(cache=db)
+    db.insert("dia_oracle_snapshots", oracle.as_dict())
+    if oracle.error and oracle.dia_price is None:
+        warnings.append(f"DIA API fetch failed: {oracle.error}")
+        console.print(f"[yellow]DIA API: FAILED ({oracle.error}) — continuing[/yellow]")
+    else:
+        partial = f" [yellow](partial: {oracle.error})[/yellow]" if oracle.error else ""
+        console.print(
+            f"[green]DIA API: ok[/green] self-price={oracle.dia_price} "
+            f"assets={oracle.quoted_assets} sources={oracle.exchange_sources} "
+            f"(active {oracle.active_scrapers}){partial}"
+        )
 
     # B. DeFiLlama protocol TVL proxy ------------------------------------
     protocols, pwarn = config_loader.load_protocols()
@@ -140,6 +154,7 @@ def cmd_export(args) -> int:
     os.makedirs(out_dir, exist_ok=True)
     tables = [
         "market_snapshots",
+        "dia_oracle_snapshots",
         "tvl_snapshots",
         "tvl_proxy",
         "competitor_snapshots",

@@ -6,7 +6,9 @@ These avoid the network: they exercise the pure/local paths only.
 import csv
 import os
 
-from dia_alpha_monitor import config_loader, defillama, reporting
+import pytest
+
+from dia_alpha_monitor import config_loader, defillama, dia_api, reporting
 from dia_alpha_monitor.cli import main
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import TvlSnapshot, today_str, utcnow
@@ -92,6 +94,56 @@ def test_tvl_report_dedupes_per_slug_on_rerun(tmp_path):
     assert len(rows) == 1  # deduped to one row per slug
     assert rows[0]["tvl"] == 150.0  # newest snapshot wins
     db.close()
+
+
+def _fake_dia_api(monkeypatch, quote=None, quote_err="", assets=None, exchanges=None):
+    """Install a fake dia_api.get_json that dispatches on the endpoint."""
+    def fake_get_json(url, **kwargs):
+        if "assetQuotation" in url:
+            return (None, quote_err) if quote_err else (quote, "")
+        if "quotedAssets" in url:
+            return assets, "" if assets is not None else "no data"
+        if "exchanges" in url:
+            return exchanges, "" if exchanges is not None else "no data"
+        return None, "unexpected url"
+    monkeypatch.setattr(dia_api, "get_json", fake_get_json)
+
+
+def test_dia_api_parses_quotation_and_coverage(monkeypatch):
+    _fake_dia_api(
+        monkeypatch,
+        quote={"Price": 0.125, "PriceYesterday": 0.130,
+               "VolumeYesterdayUSD": 207000.0, "Signature": "0xabc"},
+        assets=[{"x": 1}] * 5932,
+        exchanges=[{"ScraperActive": True}, {"ScraperActive": True},
+                   {"ScraperActive": False}],
+    )
+    snap = dia_api.fetch_dia_oracle()
+    assert snap.dia_price == 0.125
+    assert snap.dia_price_yesterday == 0.130
+    assert snap.signature == "0xabc"
+    assert snap.quoted_assets == 5932
+    assert snap.exchange_sources == 3
+    assert snap.active_scrapers == 2  # only ScraperActive truthy entries
+    assert snap.error == ""
+
+
+def test_dia_api_partial_failure_is_graceful(monkeypatch):
+    # Quotation endpoint fails; coverage still resolves -> partial, no raise.
+    _fake_dia_api(monkeypatch, quote_err="HTTP 500", assets=[{}] * 10, exchanges=[{"ScraperActive": True}])
+    snap = dia_api.fetch_dia_oracle()
+    assert snap.dia_price is None
+    assert "quotation" in snap.error
+    assert snap.quoted_assets == 10
+    assert snap.active_scrapers == 1
+
+
+def test_price_divergence_pct():
+    assert dia_api.price_divergence_pct(0.10, 0.11) == pytest.approx(10.0)
+    assert dia_api.price_divergence_pct(0.10, 0.09) == pytest.approx(-10.0)
+    assert dia_api.price_divergence_pct(None, 0.10) is None
+    assert dia_api.price_divergence_pct(0.10, None) is None
+    assert dia_api.price_divergence_pct(0.0, 0.10) is None
 
 
 def test_config_loaders_return_lists():
