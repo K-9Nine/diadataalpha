@@ -160,10 +160,58 @@ more cautious**, not more bullish.
 ## 7. Known data limitations
 
 - ~~**TVS is a single manual reading** — no history.~~ **RESOLVED:** with the DefiLlama Pro key the tool now fetches the live per-oracle TVS series (1,833 days), so TVS *level, trend and oracle-market share* are all tracked. The live figure ($112.5M) is also **lower** than the earlier manual $148M reading.
-- **No fee/revenue data — still missing even with Pro.** DefiLlama's fees dataset doesn't cover oracles (`/api/summary/fees/dia` → 404), so the decisive usage→revenue metric is *not* available from DefiLlama Pro. It would need Dune / Token Terminal / on-chain accounting of Lasernet gas + oracle-call payments.
+- **No fee/revenue figure exists anywhere — and that's structural, not a sourcing gap.** Confirmed via DefiLlama (oracles aren't in the fees dataset; `/api/summary/fees/dia` → 404) *and* an independent 12-month sweep. The reason: during the grants phase DIA's oracles are **free** (up to 12 months across 20+ chains). Crucially, the value-capture mechanism **is designed but dormant** — DIA states *"network fees generated through increased oracle adoption are fed back into DIA Lasernet, incentivising stakers."* So the flywheel (oracle fees → Lasernet → stakers) is **built but switched off**. The re-rating trigger is therefore specific: **grants→paid conversion turning fee flow on**, with staking yield shifting from emission-funded to fee-funded. Nearest read: the **Jun–Jul 2026** window (first grant cohort matures + Jul 1 staking recalibration 30%→5–6%). **Triangulated five ways** (DefiLlama, Token Terminal, the Lasernet Blockscout explorer, direct RPC reads of the fee-hook contracts, and DIA's own docs/AMA): the only on-chain fee surface — Lasernet gas — is **~1.1 DIA/day (~$0.14/day, ~$50/yr)**, matching Token Terminal's *$2.80 of gas per 30 days*, and it's **internal network gas, not customer revenue**. **Nuance:** a Nov-2023 AMA cites off-chain "data subscriptions / API access fees" — so DIA-the-*company* may earn undisclosed SaaS revenue, but **$DIA-the-token captures effectively none of it**. "Is DIA a real business?" and "is $DIA a good investment?" can have different answers.
+- **No public token-unlock schedule.** Supply is fixed (200M premined 2020, no minting). On-chain check (Ethereum, contract `0x84cA…c9419`): `totalSupply()` still reads the full **200M**, with **~31.27M parked at `0xdEaD`** (why CoinGecko shows ~168.8M "total") and **0 at `0x0`** — i.e. a one-time static removal, **no live burn mechanism**, so DIA is *not* deflationary and nothing offsets staking emissions. Circulating **119.68M**. The real near-term overhang is therefore **~49M locked (~$6M at $0.12)** — *not* the "200M − 120M = 80M" some sources cite (that double-counts burns). Modest in dollar terms, but **no granular vesting/cliff schedule is published on any tracker** (Tokenomist/DefiLlama-unlocks don't list DIA), so the overhang is **unmodellable** — a tail risk and a minor maturity/governance flag for a $15M-mcap token.
 - **RWA count (20,000+) is DIA's own headline**, not independently verified; the free API only exposes a crypto-token floor.
 - **Staking/grants are manual** — accurate as of the research date, not live.
 - **Reach proxy remains in the tool** (now clearly labelled) because it shows *which* protocols touch DIA; it must not be read as secured value.
+
+---
+
+## 9. Community & external-sentiment scan (2026-06-13)
+
+Cross-checked forums, Reddit, governance, exchange/listing history, incident
+history and an independent 12-month news sweep. Findings:
+
+- **Under-followed / low retail attention.** Repeated Reddit/forum searches found
+  *no* meaningful community discussion despite a claimed "100,000+ followers."
+  Double-edged: it's the asymmetry setup (no crowd → a catalyst could re-rate
+  fast) **and** the reason momentum is weak and the discount persists (no retail bid).
+- **Governance looks largely dormant.** No active/recent Snapshot proposals or
+  live forum threads surfaced. A quiet DAO is *less* likely to pass the
+  value-accrual proposal (fee switch / revenue share) the thesis needs.
+- **Adoption breadth ≠ economic traction.** DIA markets **250+ "data/oracle
+  users"** but DefiLlama attributes measurable TVS to only **~47 protocols**, two
+  of which hold ~88%. The gap is the free-grants dynamic in numbers.
+- **Clean record.** No hacks, exploits, delistings, lawsuits or team-dump
+  controversies found; established team (building since 2018), open-source repo.
+- **No *new* exchange catalyst.** On Coinbase/Binance/OKX since ~2022; the
+  CF Benchmarks tie-up sometimes cited is from **Feb 2022**, not recent.
+- **TVS figure discipline.** A third-party site claims "$400M TVS (7×)"; this is
+  unreliable SEO — DefiLlama (authoritative) shows **$112.5M**, and DIA's own
+  About page reports no TVS. Use $112.5M.
+- **Independent confirmation of the core gap.** A comprehensive external 12-month
+  roundup found **no fee/revenue/value-capture mechanism anywhere** — corroborating
+  that the decisive metric is genuinely absent, not just missing from our sources.
+- **Strongest "pivot is real" datapoint:** Particula's Digital Asset Risk Passport
+  (Mar 2026) — DIA as oracle layer for institutional risk-rating + PoR of tokenised
+  fixed-income/equity (Ethereum+Solana). Concrete institutional RWA infra, but
+  still no disclosed AUM or fees.
+- **Team & key-person read.** Strategy is coherent and well-articulated by senior
+  leads (Hanson/BD, Marazas/Product) who speak fluent TradFi valuation (NAV,
+  mark-to-model, reserve verification) — the right toolkit for the institutional
+  pivot; clean two-product framing (Market = liquid, Value = illiquid/fundamental).
+  **Soft flag:** CEO (Weber) and CTO (Brack) have low public visibility over the last
+  12 months (comms delegated to core-team bylines), with co-founder Claudius the
+  external face. No departures (Weber spoke at the Jun-2026 AI Infra Summit), so
+  logged as a mild key-person/engagement risk, not a red flag. Notably, **no
+  founder/senior-team communication in 12 months mentions token value-capture or
+  fees** — confirming the monetization gap is strategic, not merely unannounced.
+
+**Net:** the scan reinforces the existing verdict — a quiet, legitimate,
+under-the-radar small-cap with a real (and increasingly institutional) product
+and no crowd: a *catalyst-or-nothing* bet. Nothing here moves fair value; only
+real fee/revenue data or a named AUM customer would.
 
 ---
 
