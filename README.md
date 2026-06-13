@@ -149,6 +149,7 @@ APIs in use (CoinGecko, DeFiLlama). No third-party news/aggregators.
 | `staking_snapshots.yaml` | Manual staking/Lasernet log | `total_dia_staked`, `feeders`, `apy`, `lasernet_tx_count` |
 | `oracles.yaml` | EVM oracle-activity watchlist | `rpc_url`, `oracle_address`, `lookback_blocks` |
 | `feeds.yaml` | Manually-sourced feed figures | `rwa_assets_reported`, `rwa_source` |
+| `oracle_tvs.yaml` | Official DIA oracle TVS (DefiLlama, manual) | `defillama_tvs_usd`, `source`, `as_of` |
 | `news_feeds.yaml` | RSS feeds to auto-ingest | `url`, `default_impact`, `trusted` |
 
 **To verify a protocol's TVL slug:** open `https://defillama.com/protocol/<slug>`.

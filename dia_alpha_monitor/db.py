@@ -139,6 +139,16 @@ CREATE TABLE IF NOT EXISTS market_history (
     date TEXT PRIMARY KEY,
     price REAL, market_cap REAL, volume REAL
 );
+
+CREATE TABLE IF NOT EXISTS oracle_tvs_history (
+    date TEXT PRIMARY KEY,
+    tvs_usd REAL
+);
+
+CREATE TABLE IF NOT EXISTS dia_fees (
+    date TEXT PRIMARY KEY,
+    total_24h REAL, total_7d REAL, total_30d REAL, total_all_time REAL
+);
 """
 
 

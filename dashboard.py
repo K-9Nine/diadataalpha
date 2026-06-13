@@ -52,15 +52,26 @@ if not market.get("present"):
     st.warning("No market data captured yet.")
     st.stop()
 
+from dia_alpha_monitor import config_loader as _cl
+_tvs_meta, _ = _cl.load_oracle_tvs()
+_tvs = _tvs_meta.get("defillama_tvs_usd")
+
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("DIA price", f"${market['price']:.4f}" if market["price"] else "n/a",
           f"{market.get('change_1d') or 0:+.1f}% (1d)")
 c2.metric("Market cap", f"${(market['market_cap'] or 0)/1e6:.1f}M")
-c3.metric("DIA-linked TVL proxy", f"${(tvl['gross_tvl'] or 0)/1e6:.1f}M",
-          f"{tvl.get('weekly_change') or 0:+.1f}% (7d)")
+c3.metric("Official oracle TVS (DefiLlama)", f"${_tvs/1e6:.1f}M" if _tvs else "n/a",
+          f"mcap/TVS {(market['market_cap']/_tvs):.2f}x" if (_tvs and market.get('market_cap')) else None)
 c4.metric("Alpha score", f"{agg['total']:.1f}/100")
 
-st.info("The TVL figure is a DIA-linked PROXY (TVL of watchlisted protocols), NOT official DIA TVS.")
+if _tvs:
+    st.info(
+        f"Official DIA oracle TVS (real value secured): ${_tvs/1e6:.1f}M. "
+        f"The 'watchlist reach' figure below (gross ${(tvl['gross_tvl'] or 0)/1e9:.2f}B) sums "
+        f"WHOLE-protocol TVL of DIA users — an upper bound, ~{(tvl['gross_tvl'] or 0)/_tvs:.0f}x the real TVS — NOT secured value."
+    )
+else:
+    st.info("The TVL figure is a DIA-linked PROXY (TVL of watchlisted protocols), NOT official DIA TVS.")
 
 oracle = reporting.dia_oracle_block(db)
 if oracle.get("present"):

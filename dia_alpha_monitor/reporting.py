@@ -163,6 +163,31 @@ def feed_activity_block(db: Database) -> dict[str, Any]:
     }
 
 
+def oracle_tvs_block(db: Database) -> dict[str, Any]:
+    """Official DIA oracle TVS — live from DefiLlama Pro if available, else the
+    manual figure in config/oracle_tvs.yaml. Live data also yields 7d/30d growth.
+    """
+    live = db.latest_value("oracle_tvs_history", "tvs_usd")
+    if live is not None:
+        days = db.history_span_days("oracle_tvs_history")
+        wow = monthly = None
+        if days >= scoring.MIN_TREND_HISTORY_DAYS:
+            wow = _pct_change(live, db.nearest_before("oracle_tvs_history", 7, "tvs_usd"))
+            monthly = _pct_change(live, db.nearest_before("oracle_tvs_history", 30, "tvs_usd"))
+        return {
+            "present": True, "live": True, "tvs": live, "wow": wow, "monthly": monthly,
+            "history_days": days, "source": "DefiLlama Pro (live)",
+        }
+    meta, _ = config_loader.load_oracle_tvs()
+    if meta.get("defillama_tvs_usd"):
+        return {
+            "present": True, "live": False, "tvs": float(meta["defillama_tvs_usd"]),
+            "wow": None, "monthly": None, "top": meta.get("top_protocols"),
+            "url": meta.get("source"), "source": f"DefiLlama (manual {meta.get('as_of','?')})",
+        }
+    return {"present": False}
+
+
 def lasernet_block(db: Database) -> dict[str, Any]:
     """Latest Lasernet throughput + 7d/30d daily-tx trend from backfilled history."""
     row = db.latest("lasernet_snapshots")
@@ -240,6 +265,25 @@ def merged_news(db: Database, config_news: list[dict]) -> list[dict]:
     return combined
 
 
+def _tvl_growth_category(db: Database, tvl: dict[str, Any]) -> dict[str, Any]:
+    """Score the TVL/TVS-growth category.
+
+    Uses REAL DefiLlama-Pro oracle-TVS growth when a live history is available
+    (the honest signal); otherwise falls back to the watchlist-reach proxy
+    change, gated on >=7 days of history.
+    """
+    tvsb = oracle_tvs_block(db)
+    if tvsb.get("live") and tvsb.get("wow") is not None:
+        return scoring.score_tvl_growth(
+            tvsb["wow"], tvsb["monthly"], n_resolved=tvl.get("n_resolved", 0),
+            history_days=tvsb.get("history_days"),
+        )
+    return scoring.score_tvl_growth(
+        tvl.get("weekly_change"), tvl.get("monthly_change"),
+        tvl.get("n_resolved", 0), history_days=tvl.get("history_days"),
+    )
+
+
 def compute_alpha(db: Database) -> dict[str, Any]:
     """Build the full category breakdown + total from current DB + configs."""
     market = market_block(db)
@@ -265,12 +309,8 @@ def compute_alpha(db: Database) -> dict[str, Any]:
         scoring.score_momentum(
             market.get("change_7d"), market.get("change_30d"), market.get("vol_mcap_ratio")
         ),
-        scoring.score_tvl_growth(
-            tvl.get("weekly_change"),
-            tvl.get("monthly_change"),
-            tvl.get("n_resolved", 0),
-            history_days=tvl.get("history_days"),
-        ),
+        # Prefer REAL oracle-TVS growth (DefiLlama Pro) over the reach proxy.
+        _tvl_growth_category(db, tvl),
         scoring.score_grants(gm["new_30d"], gm["mainnet"], gm["total"]),
         scoring.score_rwa(gm["rwa"], nm["rwa_recent_30d"], nm["rwa_total"]),
         scoring.score_staking(
@@ -476,7 +516,7 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
     )
     console.print(t)
 
-    # 3. DIA-linked TVL proxy
+    # 3. DIA oracle TVS (official) vs watchlist reach (the proxy)
     if tvl.get("insufficient_history"):
         change_line = (
             f"Weekly / 30d change: [yellow]INSUFFICIENT DATA[/yellow] "
@@ -488,13 +528,36 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
             f"Weekly change: {_pct(tvl['weekly_change'])}   "
             f"30d change: {_pct(tvl['monthly_change'])}"
         )
+    # Official TVS (live DefiLlama Pro if keyed, else manual) anchors the proxy.
+    tvsb = oracle_tvs_block(db)
+    tvs = tvsb.get("tvs") if tvsb.get("present") else None
+    official_line = ""
+    if tvs:
+        mcap = market.get("market_cap")
+        mcap_tvs = f"{mcap / tvs:.2f}x" if mcap else "n/a"
+        gross = tvl.get("gross_tvl") or 0
+        overstate = f"~{gross / tvs:.0f}x" if tvs else "n/a"
+        if tvsb.get("live") and tvsb.get("wow") is not None:
+            growth = f"   TVS growth: 7d {_pct(tvsb['wow'])}  30d {_pct(tvsb['monthly'])}"
+        elif tvsb.get("live"):
+            growth = "   TVS growth: [dim]building history[/dim]"
+        else:
+            growth = ""
+        extra = f"\n  Top: {tvsb['top']}   [dim]{tvsb.get('url','')}[/dim]" if tvsb.get("top") else ""
+        official_line = (
+            f"[bold]OFFICIAL DIA oracle TVS ({tvsb['source']}): {_money(tvs)}[/bold]   "
+            f"mcap/TVS: {mcap_tvs}{growth}{extra}\n"
+            f"[yellow]⚠ The 'reach' figures below sum WHOLE-protocol TVL of DIA users — an "
+            f"UPPER BOUND, not secured value. They overstate real TVS {overstate}.[/yellow]\n─\n"
+        )
     console.print(
         Panel(
-            f"Gross DIA-linked TVL proxy: [bold]{_money(tvl['gross_tvl'])}[/bold]   "
-            f"Confidence-weighted: [bold]{_money(tvl['confidence_weighted_tvl'])}[/bold]\n"
+            official_line
+            + f"Watchlist reach (gross): [bold]{_money(tvl['gross_tvl'])}[/bold]   "
+            f"confidence-weighted: [bold]{_money(tvl['confidence_weighted_tvl'])}[/bold]\n"
             f"{change_line}   "
             f"Resolved {tvl['n_resolved']}/{tvl['n_protocols']} protocols",
-            title="3. DIA-linked TVL Proxy  ⚠ PROXY — NOT official DIA TVS",
+            title="3. DIA Oracle TVS (official) vs Watchlist Reach  ⚠ reach ≠ secured value",
             border_style="yellow",
         )
     )
