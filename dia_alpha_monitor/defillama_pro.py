@@ -40,27 +40,47 @@ def _to_date(ts: Any) -> str:
         return str(ts)[:10]
 
 
+def _coerce_tvs(v: Any) -> float | None:
+    """Return the TVS value for one oracle at one timestamp, or ``None``.
+
+    The per-oracle value is either a bare number or, in the real live payload, a
+    breakdown dict ``{"tvl": <num>, "staking": ..., "pool2": ..., "borrowed": ...}``
+    where ``tvl`` is the secured value (TVS) we report.
+    """
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, dict):
+        tvl = v.get("tvl")
+        if isinstance(tvl, (int, float)) and not isinstance(tvl, bool):
+            return float(tvl)
+    return None
+
+
 def _extract_oracle_series(data: dict, oracle: str) -> dict[str, float]:
     """Pull a {date: tvs} series for one oracle from an /api/oracles payload.
 
-    Tolerant of the two shapes seen in the wild:
-      A) {"chart": {"<ts>": {"DIA": tvs, ...}, ...}}
-      B) {"chart": [[<ts>, {"DIA": tvs, ...}], ...]}
+    Tolerant of the shapes seen in the wild:
+      A)  {"chart": {"<ts>": {"DIA": tvs, ...}, ...}}
+      A') {"chart": {"<ts>": {"DIA": {"tvl": tvs, ...}, ...}, ...}}  (real live shape)
+      B)  {"chart": [[<ts>, {"DIA": tvs, ...}], ...]}
+    The per-oracle value may be a bare number or a ``{"tvl": ...}`` breakdown dict.
     """
     chart = data.get("chart")
     series: dict[str, float] = {}
     if isinstance(chart, dict):
         for ts, mapping in chart.items():
             if isinstance(mapping, dict):
-                v = mapping.get(oracle)
-                if isinstance(v, (int, float)):
-                    series[_to_date(ts)] = float(v)
+                v = _coerce_tvs(mapping.get(oracle))
+                if v is not None:
+                    series[_to_date(ts)] = v
     elif isinstance(chart, list):
         for point in chart:
             if isinstance(point, (list, tuple)) and len(point) == 2 and isinstance(point[1], dict):
-                v = point[1].get(oracle)
-                if isinstance(v, (int, float)):
-                    series[_to_date(point[0])] = float(v)
+                v = _coerce_tvs(point[1].get(oracle))
+                if v is not None:
+                    series[_to_date(point[0])] = v
     return series
 
 
