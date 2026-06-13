@@ -20,6 +20,7 @@ from dia_alpha_monitor.http_client import get_json
 from dia_alpha_monitor.models import LasernetSnapshot, today_str, utcnow
 
 STATS_URL = "https://explorer.diadata.org/api/v2/stats"
+CHART_URL = "https://explorer.diadata.org/api/v2/stats/charts/transactions"
 
 
 def _to_int(v: object) -> Optional[int]:
@@ -46,3 +47,24 @@ def fetch_lasernet(cache=None) -> LasernetSnapshot:
     if snap.total_transactions is None and snap.transactions_today is None:
         snap.error = "stats payload missing expected fields"
     return snap
+
+
+def fetch_lasernet_history(cache=None) -> tuple[list[dict], str]:
+    """Daily Lasernet transaction counts (the Blockscout tx chart, ~31 days).
+
+    Backfilling this gives a real throughput *trend* immediately, instead of
+    waiting for our own daily snapshots to accumulate. Returns
+    ``([{date, transactions_count}], error)``.
+    """
+    data, err = get_json(CHART_URL, cache=cache, cache_source="lasernet", cache_key="tx_chart")
+    if err or not isinstance(data, dict):
+        return [], err or "no data"
+    chart = data.get("chart") or data.get("chart_data") or []
+    out: list[dict] = []
+    for p in chart:
+        d = p.get("date")
+        c = p.get("transactions_count", p.get("tx_count", p.get("value")))
+        n = _to_int(c)
+        if d and n is not None:
+            out.append({"date": str(d)[:10], "transactions_count": n})
+    return out, ""

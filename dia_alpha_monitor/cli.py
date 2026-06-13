@@ -53,6 +53,15 @@ def cmd_run(args) -> int:
         console.print(f"[green]Market: ok[/green] price={market.price} mcap={market.market_cap}")
     db.insert("market_snapshots", market.as_dict())
 
+    # A1b. Backfill daily price/mcap/volume history (real momentum trend) -
+    mhist, mherr = coingecko.fetch_market_chart(cg_id, days=90, cache=db)
+    for row in mhist:
+        db.upsert("market_history", row)
+    if mherr:
+        warnings.append(f"Market history backfill failed: {mherr}")
+    else:
+        console.print(f"[green]Market history: ok[/green] {len(mhist)} days backfilled")
+
     # A2. DIA's own API (primary source: signed self-price + coverage) ----
     oracle = dia_api.fetch_dia_oracle(cache=db)
     db.insert("dia_oracle_snapshots", oracle.as_dict())
@@ -91,6 +100,15 @@ def cmd_run(args) -> int:
             f"[green]Lasernet: ok[/green] tx_today={lnet.transactions_today:,} "
             f"total_tx={lnet.total_transactions:,} blocks={lnet.total_blocks:,}"
         )
+
+    # A3c. Backfill Lasernet daily-tx history (real throughput trend) -----
+    lhist, lherr = lasernet.fetch_lasernet_history(cache=db)
+    for row in lhist:
+        db.upsert("lasernet_history", row)
+    if lherr:
+        warnings.append(f"Lasernet history backfill failed: {lherr}")
+    else:
+        console.print(f"[green]Lasernet history: ok[/green] {len(lhist)} days backfilled")
 
     # A4. On-chain oracle activity via public RPC (real usage signal) -----
     oracle_chains, ocwarn = config_loader.load_oracles()
@@ -226,6 +244,8 @@ def cmd_export(args) -> int:
         "competitor_snapshots",
         "staking_snapshots",
         "ingested_news",
+        "lasernet_history",
+        "market_history",
         "score_snapshots",
     ]
     written = []

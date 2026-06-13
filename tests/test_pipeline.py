@@ -12,6 +12,7 @@ from datetime import timedelta
 
 from dia_alpha_monitor import (
     alerts,
+    coingecko,
     config_loader,
     defillama,
     dia_api,
@@ -353,6 +354,63 @@ def test_merged_news_manual_wins(monkeypatch, tmp_path):
                     "https://www.diadata.org/blog/post/y"]   # x not duplicated
     x = [n for n in merged if reporting._norm_url(n["url"]).endswith("/x")][0]
     assert x["title"] == "manual x" and not x.get("ingested")  # manual won
+    db.close()
+
+
+def test_market_chart_buckets_to_daily(monkeypatch):
+    # Two UTC days of points; the last point of each day should win.
+    payload = {
+        "prices": [[1700000000000, 1.0], [1700003600000, 1.1], [1700086400000, 2.0]],
+        "market_caps": [[1700000000000, 10.0], [1700086400000, 20.0]],
+        "total_volumes": [[1700000000000, 5.0]],
+    }
+    monkeypatch.setattr(coingecko, "get_json", lambda *a, **k: (payload, ""))
+    rows, err = coingecko.fetch_market_chart("dia-data", days=2)
+    assert err == "" and len(rows) == 2          # collapsed hourly -> 2 daily rows
+    assert rows[0]["price"] == 1.1               # last point of day 1 wins
+    assert rows[0]["market_cap"] == 10.0 and rows[0]["volume"] == 5.0
+    assert rows[1]["price"] == 2.0 and rows[1]["volume"] is None
+
+
+def test_lasernet_history_parse(monkeypatch):
+    monkeypatch.setattr(
+        lasernet, "get_json",
+        lambda *a, **k: ({"chart": [
+            {"date": "2026-06-12", "transactions_count": 313152},
+            {"date": "2026-06-11", "transactions_count": "314559"},  # string coerced
+        ]}, ""),
+    )
+    rows, err = lasernet.fetch_lasernet_history()
+    assert err == "" and len(rows) == 2
+    assert rows[0]["transactions_count"] == 313152
+    assert rows[1]["transactions_count"] == 314559
+
+
+def test_db_upsert_and_latest_value(tmp_path):
+    db = Database(str(tmp_path / "h.db"))
+    db.upsert("lasernet_history", {"date": "2026-06-10", "transactions_count": 100})
+    db.upsert("lasernet_history", {"date": "2026-06-10", "transactions_count": 150})  # replace
+    db.upsert("lasernet_history", {"date": "2026-06-12", "transactions_count": 200})
+    n = db.conn.execute("SELECT COUNT(*) c FROM lasernet_history").fetchone()["c"]
+    assert n == 2  # same-date row replaced, not duplicated
+    assert db.latest_value("lasernet_history", "transactions_count") == 200  # newest date
+    db.close()
+
+
+def test_lasernet_block_trend_from_history(tmp_path):
+    db = Database(str(tmp_path / "lt.db"))
+    db.insert("lasernet_snapshots", {
+        "date": today_str(), "ts": utcnow().isoformat(), "total_transactions": 57_000_000,
+        "transactions_today": 320, "total_blocks": 28_000_000, "total_addresses": 2000,
+        "source": "t", "error": "",
+    })
+    # 31 days of history: 30d ago = 200, 7d ago = 300, today = 330
+    for ago, count in ((30, 200), (7, 300), (0, 330)):
+        d = (utcnow() - timedelta(days=ago)).strftime("%Y-%m-%d")
+        db.upsert("lasernet_history", {"date": d, "transactions_count": count})
+    block = reporting.lasernet_block(db)
+    assert block["wow_today"] == pytest.approx((330 - 300) / 300 * 100)   # +10%
+    assert block["monthly"] == pytest.approx((330 - 200) / 200 * 100)     # +65%
     db.close()
 
 

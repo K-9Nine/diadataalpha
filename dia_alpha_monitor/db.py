@@ -129,6 +129,16 @@ CREATE TABLE IF NOT EXISTS ingested_news (
     title TEXT, url TEXT UNIQUE,
     source TEXT, category TEXT, impact_score INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS lasernet_history (
+    date TEXT PRIMARY KEY,
+    transactions_count INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS market_history (
+    date TEXT PRIMARY KEY,
+    price REAL, market_cap REAL, volume REAL
+);
 """
 
 
@@ -163,6 +173,24 @@ class Database:
         self.conn.commit()
         return int(cur.lastrowid)
 
+    def upsert(self, table: str, row: dict[str, Any]) -> None:
+        """Insert or replace a row keyed on its PRIMARY KEY (used by history tables)."""
+        cols = ", ".join(row.keys())
+        placeholders = ", ".join("?" for _ in row)
+        self.conn.execute(
+            f"INSERT OR REPLACE INTO {table}({cols}) VALUES ({placeholders})",
+            tuple(row.values()),
+        )
+        self.conn.commit()
+
+    def latest_value(self, table: str, value_col: str) -> Optional[float]:
+        """Most-recent non-null ``value_col`` ordered by ``date`` (for history tables)."""
+        row = self.conn.execute(
+            f"SELECT {value_col} AS v FROM {table} WHERE {value_col} IS NOT NULL"
+            " ORDER BY date DESC LIMIT 1"
+        ).fetchone()
+        return None if row is None or row["v"] is None else float(row["v"])
+
     def latest(self, table: str, where: str = "", params: tuple = ()) -> Optional[sqlite3.Row]:
         sql = f"SELECT * FROM {table}"
         if where:
@@ -191,7 +219,8 @@ class Database:
         return cur.fetchall()
 
     def all_rows(self, table: str) -> list[sqlite3.Row]:
-        cur = self.conn.execute(f"SELECT * FROM {table} ORDER BY id ASC")
+        # ORDER BY rowid (not id) so this works for history tables keyed on date.
+        cur = self.conn.execute(f"SELECT * FROM {table} ORDER BY rowid ASC")
         return cur.fetchall()
 
     def history_span_days(self, table: str, where: str = "", params: tuple = ()) -> float:
