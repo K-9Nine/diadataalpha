@@ -166,6 +166,27 @@ class OracleActivitySnapshot:
 
 
 @dataclass
+class LasernetSnapshot:
+    """Throughput reading from Lasernet, DIA's oracle rollup (its Blockscout API).
+
+    Lasernet is a purpose-built oracle rollup, so its transaction throughput is
+    a direct, trustless usage signal — what the TVL "proxy" only approximates.
+    """
+
+    date: str
+    ts: str
+    total_transactions: Optional[int] = None
+    transactions_today: Optional[int] = None
+    total_blocks: Optional[int] = None
+    total_addresses: Optional[int] = None
+    source: str = "lasernet/blockscout"
+    error: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class ScoreSnapshot:
     date: str
     ts: str

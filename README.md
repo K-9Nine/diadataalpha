@@ -33,6 +33,10 @@ for that.
 - **On-chain oracle activity** (public EVM RPC, no key): polls the DIA oracle
   contract on each chain in `config/oracles.yaml` for update logs over a recent
   block window — a **direct on-chain usage** signal (vs the TVL *proxy*).
+- **Lasernet throughput** (`explorer.diadata.org`, Blockscout, no key): daily
+  transaction count on DIA's oracle rollup — where oracle activity *actually*
+  happens. Since Lasernet is a purpose-built oracle rollup, its throughput ≈
+  oracle operations, the strongest trustless usage signal in the tool.
 - **Grant funnel analysis**: announced → testnet → mainnet conversion rates,
   plus a flag for **stale grants** stuck pre-mainnet for >90 days.
 - **[ALERT] banner**: any tracked metric moving **>10% week-over-week** is
@@ -135,6 +139,7 @@ APIs in use (CoinGecko, DeFiLlama). No third-party news/aggregators.
 | `news.yaml` | RWA / narrative items | `category`, `impact_score` (1-5), `url` |
 | `staking_snapshots.yaml` | Manual staking/Lasernet log | `total_dia_staked`, `feeders`, `apy`, `lasernet_tx_count` |
 | `oracles.yaml` | EVM oracle-activity watchlist | `rpc_url`, `oracle_address`, `lookback_blocks` |
+| `feeds.yaml` | Manually-sourced feed figures | `rwa_assets_reported`, `rwa_source` |
 
 **To verify a protocol's TVL slug:** open `https://defillama.com/protocol/<slug>`.
 A wrong slug shows as an error on that row in the report; fix it in the YAML.
@@ -152,8 +157,9 @@ python -m dia_alpha_monitor export --out /tmp # custom directory
 ```
 
 One CSV per table: `market_snapshots`, `dia_oracle_snapshots`,
-`feed_activity_snapshots`, `oracle_activity_snapshots`, `tvl_snapshots`,
-`tvl_proxy`, `competitor_snapshots`, `staking_snapshots`, `score_snapshots`.
+`feed_activity_snapshots`, `oracle_activity_snapshots`, `lasernet_snapshots`,
+`tvl_snapshots`, `tvl_proxy`, `competitor_snapshots`, `staking_snapshots`,
+`score_snapshots`.
 
 ---
 
@@ -223,7 +229,7 @@ dia-alpha-monitor/
   dia_alpha_monitor/
     __init__.py  __main__.py  cli.py  db.py  http_client.py
     coingecko.py  dia_api.py  feed_activity.py  defillama.py
-    evm_oracle.py  grants.py  alerts.py  config_loader.py
+    evm_oracle.py  lasernet.py  grants.py  alerts.py  config_loader.py
     scoring.py  reporting.py  valuation.py  models.py
   dashboard.py       # optional Streamlit app
   exports/           # CSV output

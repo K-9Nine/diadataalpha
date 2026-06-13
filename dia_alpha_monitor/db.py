@@ -112,6 +112,15 @@ CREATE TABLE IF NOT EXISTS oracle_activity_snapshots (
     from_block INTEGER, to_block INTEGER,
     source TEXT, error TEXT
 );
+
+CREATE TABLE IF NOT EXISTS lasernet_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    total_transactions INTEGER, transactions_today INTEGER,
+    total_blocks INTEGER, total_addresses INTEGER,
+    source TEXT, error TEXT
+);
 """
 
 

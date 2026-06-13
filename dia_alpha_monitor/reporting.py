@@ -155,6 +155,27 @@ def feed_activity_block(db: Database) -> dict[str, Any]:
     }
 
 
+def lasernet_block(db: Database) -> dict[str, Any]:
+    """Latest Lasernet throughput reading + week-over-week change if available."""
+    row = db.latest("lasernet_snapshots")
+    if row is None:
+        return {"present": False}
+    wow_today = None
+    if db.history_span_days("lasernet_snapshots") >= scoring.MIN_TREND_HISTORY_DAYS:
+        prev = db.nearest_before("lasernet_snapshots", 7, "transactions_today")
+        wow_today = _pct_change(row["transactions_today"], prev)
+    return {
+        "present": True,
+        "total_transactions": row["total_transactions"],
+        "transactions_today": row["transactions_today"],
+        "total_blocks": row["total_blocks"],
+        "total_addresses": row["total_addresses"],
+        "wow_today": wow_today,
+        "error": row["error"],
+        "date": row["date"],
+    }
+
+
 def oracle_activity_block(db: Database) -> dict[str, Any]:
     """Latest on-chain oracle-activity reading per configured chain."""
     rows = db.conn.execute(
@@ -387,14 +408,23 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
     feeds = feed_activity_block(db)
     if feeds.get("present"):
         total = feeds["total_feeds"]
+        feeds_meta, _ = config_loader.load_feeds_meta()
+        rwa_reported = feeds_meta.get("rwa_assets_reported")
+        rwa_line = ""
+        if rwa_reported:
+            rwa_line = (
+                f"\nRWA assets (DIA-reported, manual): [bold]{int(rwa_reported):,}+[/bold] "
+                f"as of {feeds_meta.get('rwa_as_of','?')}  [dim]{feeds_meta.get('rwa_source','')}[/dim]"
+            )
         fl = (
-            f"Total feeds: [bold]{total:,}[/bold]   "
+            f"Total feeds (live REST): [bold]{total:,}[/bold]   "
             f"crypto: {feeds['crypto_feeds']:,}   "
-            f"RWA*: {feeds['rwa_feeds']}   "
+            f"RWA floor*: {feeds['rwa_feeds']}   "
             f"blockchains: {feeds['n_blockchains']}   "
-            f"active sources: {feeds['active_sources']}\n"
-            f"[dim]*RWA is a floor — the free REST endpoint is crypto-token-centric; "
-            f"DIA's full RWA/xReal catalogue isn't enumerated there. Tracked daily for growth.[/dim]"
+            f"active sources: {feeds['active_sources']}"
+            f"{rwa_line}\n"
+            f"[dim]*live RWA is a floor — the free REST endpoint is crypto-token-centric; "
+            f"DIA's full RWA/xReal catalogue isn't enumerated there (hence the manual figure).[/dim]"
         ) if total is not None else "[yellow]feed coverage unavailable[/yellow]"
         if feeds["error"]:
             fl += f"\n[yellow]partial: {feeds['error']}[/yellow]"
@@ -477,6 +507,26 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
         console.print(
             "[dim]0 updates can be legitimate — many legacy push-oracles are quiet under "
             "DIA's Lasernet pull model. Add active production addresses in config/oracles.yaml.[/dim]"
+        )
+
+    # 3c. Lasernet throughput — where DIA oracle activity actually happens
+    lnet = lasernet_block(db)
+    if lnet.get("present") and lnet["transactions_today"] is not None:
+        wow = (
+            f"   WoW: {_pct(lnet['wow_today'])}"
+            if lnet["wow_today"] is not None
+            else "   WoW: [dim]INSUFFICIENT DATA (need ≥7d)[/dim]"
+        )
+        console.print(
+            Panel(
+                f"Transactions today: [bold]{lnet['transactions_today']:,}[/bold]{wow}\n"
+                f"Total transactions: {lnet['total_transactions']:,}   "
+                f"blocks: {lnet['total_blocks']:,}   addresses: {lnet['total_addresses']:,}\n"
+                f"[dim]Lasernet is DIA's oracle rollup — throughput ≈ oracle operations, "
+                f"a direct trustless usage signal (vs the TVL proxy).[/dim]",
+                title="3c. Lasernet Oracle Throughput (source: explorer.diadata.org)",
+                border_style="green",
+            )
         )
 
     # 4. New integrations / grants (+ funnel conversion analysis)

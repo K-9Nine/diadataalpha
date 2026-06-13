@@ -6,10 +6,11 @@
 - **What it is:** a local Python tool that collects DIA Data / DIA Oracles
   signals (market, DIA-linked TVL proxy, grants, RWA news, staking, competitors)
   into SQLite and prints a transparent 0–100 "alpha score" + investor report.
-- **Status:** **built, tested (41 passing), committed, and pushed.** v1 + v2.
+- **Status:** **built, tested (44 passing), committed, and pushed.** v1 + v2.
   Live APIs validated; DIA's own API (`dia_api.py`) is a primary signed source.
   v2 added: feed-coverage tracker, on-chain oracle polling, grant funnel,
-  ≥7-day trend gating, and a week-over-week [ALERT] banner.
+  ≥7-day trend gating, a week-over-week [ALERT] banner, and a **Lasernet
+  throughput** collector (real oracle-usage signal via explorer.diadata.org).
 - **Branch:** PR #1 (`claude/dia-alpha-monitor-build-8p1br6`) is **merged into
   `main`**. Current work continues on `claude/friendly-hawking-2tu1jf`.
 - **Repo:** `K-9Nine/diadataalpha` (this is the target repo; `answergraph3` is unrelated).
@@ -56,10 +57,10 @@ date. `reporting.py` now keeps the newest row per slug (`MAX(id) GROUP BY slug`)
 ## What works today (verified locally, no network)
 - `run` / `report` / `export` all work and **never crash on a failed source**
   (failures are recorded in the report + `raw_cache` table).
-- Valuation maths, scoring model, config loading, TVL-proxy aggregation, the
-  chain-vs-protocol TVL routing, per-slug report dedup, the DIA-API collector
-  (parsing + partial-failure + price-divergence), and CSV export are covered by
-  **33 passing pytest tests** (no network needed).
+- Valuation maths, scoring model (incl. ≥7d trend gate), config loading, TVL
+  routing + dedup, the DIA-API / feed-coverage / Lasernet collectors, the EVM
+  oracle poller, the grant funnel, the WoW alerts, and CSV export are covered by
+  **44 passing pytest tests** (no network needed).
 - Full report rendering confirmed with seeded data (all 10 sections, absolute +
   relative valuation scenarios, score breakdown).
 
@@ -73,6 +74,7 @@ dia_alpha_monitor/
                   #   (quoted assets / exchange sources) + price-divergence check
   feed_activity.py# daily feed-coverage snapshot + RWA-vs-crypto split (v2)
   evm_oracle.py   # on-chain oracle update polling via public RPC (v2)
+  lasernet.py     # Lasernet rollup throughput via Blockscout API — real usage (v2)
   grants.py       # grant funnel: conversion rates + stale-grant flags (v2)
   alerts.py       # week-over-week >10% movement [ALERT]s (v2)
   defillama.py    # per-protocol AND per-chain (kind: chain) TVL + compute_proxy()
@@ -126,13 +128,16 @@ Key design rules to preserve:
       first live run self-diagnosing.
 - [x] CI workflow running `pytest` (`.github/workflows/ci.yml`, uv, py3.11+3.12,
       offline tests) — added 2026-06-12.
-- [~] v2 on-chain usage collector: DONE as `evm_oracle.py` (config-driven log
-      polling). NEXT: populate `config/oracles.yaml` with verified ACTIVE
-      production oracle/adapter addresses (e.g. Parallel's AggregatorV3 adapters
-      on Base/Sonic/Avalanche/HyperEVM) — the seeded legacy addresses are quiet.
-- [ ] v2 ideas remaining: RSS auto-ingest for the news tracker; richer RWA feed
-      classification if DIA exposes an asset-class endpoint (REST is currently
-      crypto-token-centric, so `feed_activity.rwa_feeds` is a floor).
+- [x] On-chain usage signal: SOLVED via `lasernet.py` — Lasernet (DIA's oracle
+      rollup) throughput from explorer.diadata.org Blockscout API (~313k tx/day).
+      This is where oracle activity actually happens (the consumer-chain
+      `evm_oracle.py` poller stays as a complementary signal; its seeded legacy
+      addresses are quiet — add active production adapters if wanted).
+- [x] RWA undercount: mitigated via `config/feeds.yaml` — DIA's published
+      "20,000+ RWA assets" recorded as a labelled, sourced manual figure shown
+      next to the live REST floor. DEEPER (not done): decode Lasernet oracle
+      feed KEYS (e.g. "AAPL/USD") to classify RWA vs crypto precisely.
+- [ ] v2 ideas remaining: RSS auto-ingest for the news tracker.
 - [ ] Feed DIA-API/feed-coverage signals into the 0–100 score (currently shown
       but not scored — would need a deliberate weight rebalance).
 

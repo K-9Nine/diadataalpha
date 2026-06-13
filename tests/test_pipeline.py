@@ -18,6 +18,7 @@ from dia_alpha_monitor import (
     evm_oracle,
     feed_activity,
     grants as grant_analysis,
+    lasernet,
     reporting,
     scoring,
 )
@@ -274,6 +275,34 @@ def test_alerts_suppressed_without_history(tmp_path):
     fired = alerts.week_over_week_alerts(db, threshold=10.0)
     db.close()
     assert fired == []
+
+
+def test_lasernet_parses_string_counters(monkeypatch):
+    # Blockscout returns big numbers as strings — must coerce to int.
+    monkeypatch.setattr(
+        lasernet, "get_json",
+        lambda *a, **k: (
+            {"total_transactions": "57441909", "transactions_today": "313152",
+             "total_blocks": "28663051", "total_addresses": "2019"}, ""),
+    )
+    snap = lasernet.fetch_lasernet()
+    assert snap.transactions_today == 313152
+    assert snap.total_transactions == 57441909
+    assert snap.total_blocks == 28663051
+    assert snap.error == ""
+
+
+def test_lasernet_graceful_on_failure(monkeypatch):
+    monkeypatch.setattr(lasernet, "get_json", lambda *a, **k: (None, "HTTP 503"))
+    snap = lasernet.fetch_lasernet()
+    assert snap.transactions_today is None
+    assert snap.error == "HTTP 503"
+
+
+def test_feeds_meta_loads():
+    meta, warn = config_loader.load_feeds_meta()
+    assert isinstance(meta, dict)
+    assert meta.get("rwa_assets_reported")  # shipped figure present
 
 
 def test_config_loaders_return_lists():

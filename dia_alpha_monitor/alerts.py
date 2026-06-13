@@ -22,6 +22,7 @@ _METRICS = [
     ("Quoted assets (coverage)", "dia_oracle_snapshots", "quoted_assets", "int"),
     ("Total feeds", "feed_activity_snapshots", "total_feeds", "int"),
     ("Active exchange sources", "feed_activity_snapshots", "active_sources", "int"),
+    ("Lasernet daily throughput", "lasernet_snapshots", "transactions_today", "int"),
     ("DIA staked", "staking_snapshots", "total_staked", "int"),
 ]
 

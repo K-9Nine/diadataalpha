@@ -69,6 +69,12 @@ def load_oracles() -> tuple[list[dict], str]:
     return list(items or []), warn
 
 
+def load_feeds_meta() -> tuple[dict, str]:
+    """Manually-sourced feed figures (e.g. DIA's published RWA asset count)."""
+    data, warn = _load_yaml("feeds.yaml")
+    return (data if isinstance(data, dict) else {}), warn
+
+
 # -- derived metrics -------------------------------------------------------
 
 def _parse_date(value: Any) -> datetime | None:

@@ -93,6 +93,16 @@ if feeds.get("present") and feeds["total_feeds"] is not None:
     f4.metric("Active sources", feeds["active_sources"])
     st.caption("*RWA is a floor — the free REST endpoint is crypto-token-centric.")
 
+lnet = reporting.lasernet_block(db)
+if lnet.get("present") and lnet["transactions_today"] is not None:
+    st.subheader("Lasernet oracle throughput (source: explorer.diadata.org)")
+    l1, l2, l3 = st.columns(3)
+    l1.metric("Transactions today", f"{lnet['transactions_today']:,}",
+              f"{lnet['wow_today']:+.1f}% WoW" if lnet["wow_today"] is not None else None)
+    l2.metric("Total transactions", f"{lnet['total_transactions']:,}")
+    l3.metric("Addresses", f"{lnet['total_addresses']:,}")
+    st.caption("Lasernet is DIA's oracle rollup — throughput ≈ oracle operations (real usage signal).")
+
 oa = reporting.oracle_activity_block(db)
 if oa.get("present"):
     st.subheader("On-chain DIA oracle activity (public RPC — real usage signal)")

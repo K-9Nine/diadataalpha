@@ -23,6 +23,7 @@ from dia_alpha_monitor import (
     dia_api,
     evm_oracle,
     feed_activity,
+    lasernet,
     reporting,
 )
 from dia_alpha_monitor.db import Database
@@ -76,6 +77,18 @@ def cmd_run(args) -> int:
             f"[green]Feed coverage: ok[/green] total={feeds.total_feeds} "
             f"(crypto={feeds.crypto_feeds} rwa*={feeds.rwa_feeds}) "
             f"chains={feeds.n_blockchains} active_sources={feeds.active_sources}"
+        )
+
+    # A3b. Lasernet throughput — DIA's oracle rollup (real usage signal) --
+    lnet = lasernet.fetch_lasernet(cache=db)
+    db.insert("lasernet_snapshots", lnet.as_dict())
+    if lnet.error and lnet.total_transactions is None:
+        warnings.append(f"Lasernet fetch failed: {lnet.error}")
+        console.print(f"[yellow]Lasernet: FAILED ({lnet.error})[/yellow]")
+    else:
+        console.print(
+            f"[green]Lasernet: ok[/green] tx_today={lnet.transactions_today:,} "
+            f"total_tx={lnet.total_transactions:,} blocks={lnet.total_blocks:,}"
         )
 
     # A4. On-chain oracle activity via public RPC (real usage signal) -----
@@ -193,6 +206,7 @@ def cmd_export(args) -> int:
         "dia_oracle_snapshots",
         "feed_activity_snapshots",
         "oracle_activity_snapshots",
+        "lasernet_snapshots",
         "tvl_snapshots",
         "tvl_proxy",
         "competitor_snapshots",
