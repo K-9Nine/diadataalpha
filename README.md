@@ -41,6 +41,10 @@ for that.
   plus a flag for **stale grants** stuck pre-mainnet for >90 days.
 - **[ALERT] banner**: any tracked metric moving **>10% week-over-week** is
   surfaced at the top of the report (suppressed until ≥7 days of history).
+- **RSS auto-ingestion**: feeds in `config/news_feeds.yaml` (DIA's blog by
+  default) are fetched on every `run`, keyword-classified, de-duplicated by URL,
+  and merged into the news tracker (manual `news.yaml` entries win); ingested
+  items are tagged `[rss]` in the report.
 - **DIA-linked TVL proxy** (DeFiLlama, free): TVL of a configurable watchlist of
   protocols believed to use DIA oracles, with manual `dia_role` / `confidence` /
   `evidence_url`. Produces a gross proxy and a **confidence-weighted** proxy,
@@ -140,6 +144,7 @@ APIs in use (CoinGecko, DeFiLlama). No third-party news/aggregators.
 | `staking_snapshots.yaml` | Manual staking/Lasernet log | `total_dia_staked`, `feeders`, `apy`, `lasernet_tx_count` |
 | `oracles.yaml` | EVM oracle-activity watchlist | `rpc_url`, `oracle_address`, `lookback_blocks` |
 | `feeds.yaml` | Manually-sourced feed figures | `rwa_assets_reported`, `rwa_source` |
+| `news_feeds.yaml` | RSS feeds to auto-ingest | `url`, `default_impact`, `trusted` |
 
 **To verify a protocol's TVL slug:** open `https://defillama.com/protocol/<slug>`.
 A wrong slug shows as an error on that row in the report; fix it in the YAML.
@@ -159,7 +164,7 @@ python -m dia_alpha_monitor export --out /tmp # custom directory
 One CSV per table: `market_snapshots`, `dia_oracle_snapshots`,
 `feed_activity_snapshots`, `oracle_activity_snapshots`, `lasernet_snapshots`,
 `tvl_snapshots`, `tvl_proxy`, `competitor_snapshots`, `staking_snapshots`,
-`score_snapshots`.
+`ingested_news`, `score_snapshots`.
 
 ---
 
@@ -229,8 +234,8 @@ dia-alpha-monitor/
   dia_alpha_monitor/
     __init__.py  __main__.py  cli.py  db.py  http_client.py
     coingecko.py  dia_api.py  feed_activity.py  defillama.py
-    evm_oracle.py  lasernet.py  grants.py  alerts.py  config_loader.py
-    scoring.py  reporting.py  valuation.py  models.py
+    evm_oracle.py  lasernet.py  rss_ingest.py  grants.py  alerts.py
+    config_loader.py  scoring.py  reporting.py  valuation.py  models.py
   dashboard.py       # optional Streamlit app
   exports/           # CSV output
   tests/             # pytest (valuation + scoring + pipeline)

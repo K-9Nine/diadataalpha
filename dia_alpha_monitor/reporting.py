@@ -17,7 +17,15 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from dia_alpha_monitor import alerts, config_loader, dia_api, grants as grant_analysis, scoring, valuation
+from dia_alpha_monitor import (
+    alerts,
+    config_loader,
+    dia_api,
+    grants as grant_analysis,
+    rss_ingest,
+    scoring,
+    valuation,
+)
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import (
     DIA_COINGECKO_ID,
@@ -207,6 +215,24 @@ def competitor_block(db: Database) -> dict[str, Any]:
     return {"present": bool(rows), "competitors": rows, "leading": leading}
 
 
+def _norm_url(u: str) -> str:
+    return (u or "").strip().rstrip("/").lower()
+
+
+def merged_news(db: Database, config_news: list[dict]) -> list[dict]:
+    """Combine manual config news with RSS-ingested items (manual wins on URL)."""
+    seen = {_norm_url(n.get("url", "")) for n in config_news if n.get("url")}
+    combined = list(config_news)
+    for item in rss_ingest.load_ingested(db):
+        if _norm_url(item.get("url", "")) in seen:
+            continue
+        item = dict(item)
+        item["ingested"] = True
+        item.setdefault("notes", "auto-ingested via RSS")
+        combined.append(item)
+    return combined
+
+
 def compute_alpha(db: Database) -> dict[str, Any]:
     """Build the full category breakdown + total from current DB + configs."""
     market = market_block(db)
@@ -215,6 +241,7 @@ def compute_alpha(db: Database) -> dict[str, Any]:
 
     grants, _ = config_loader.load_grants()
     news, _ = config_loader.load_news()
+    news = merged_news(db, news)  # fold in RSS-ingested items (manual wins)
     staking_raw, _ = config_loader.load_staking()
     gm = config_loader.grants_metrics(grants)
     nm = config_loader.news_metrics(news)
@@ -573,11 +600,12 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
         )
     )
     if nm["top_high_impact"]:
-        console.print("[dim]  Top recent high-impact items:[/dim]")
+        console.print("[dim]  Top recent high-impact items ([cyan]rss[/cyan] = auto-ingested):[/dim]")
         for n in nm["top_high_impact"][:10]:
+            tag = " [cyan]\\[rss][/cyan]" if n.get("ingested") else ""
             console.print(
                 f"  • [{n.get('impact_score','?')}/5] {n.get('date','?')} "
-                f"[{n.get('category','?')}] {n.get('title','?')}  {n.get('url','')}"
+                f"[{n.get('category','?')}]{tag} {n.get('title','?')}  {n.get('url','')}"
             )
 
     # 6. Staking / Lasernet

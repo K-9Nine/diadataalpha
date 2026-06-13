@@ -20,6 +20,7 @@ from dia_alpha_monitor import (
     grants as grant_analysis,
     lasernet,
     reporting,
+    rss_ingest,
     scoring,
 )
 from dia_alpha_monitor.cli import main
@@ -303,6 +304,56 @@ def test_feeds_meta_loads():
     meta, warn = config_loader.load_feeds_meta()
     assert isinstance(meta, dict)
     assert meta.get("rwa_assets_reported")  # shipped figure present
+
+
+_SAMPLE_RSS = """<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>DIA Powers Fair Value Pricing for hemiBTC</title>
+<link>https://www.diadata.org/blog/post/x</link>
+<pubDate>Thu, 11 Jun 2026 14:50:03 +0000</pubDate></item>
+<item><title>Update on DIA Staking</title>
+<link>https://www.diadata.org/blog/post/y</link>
+<pubDate>Fri, 05 Jun 2026 10:37:02 +0000</pubDate></item>
+</channel></rss>"""
+
+
+def test_rss_parse_and_classify():
+    items = rss_ingest.parse_rss(_SAMPLE_RSS, source="DIA blog", default_impact=3)
+    assert len(items) == 2
+    assert items[0]["date"] == "2026-06-11"
+    assert items[0]["category"] in ("integration", "RWA")  # "Powers ... Pricing"
+    staking = items[1]
+    assert staking["category"] == "staking"
+    assert 1 <= staking["impact_score"] <= 5
+
+
+def test_rss_ingest_dedups(monkeypatch, tmp_path):
+    monkeypatch.setattr(rss_ingest, "get_text", lambda *a, **k: (_SAMPLE_RSS, ""))
+    db = Database(str(tmp_path / "n.db"))
+    feeds = [{"name": "DIA blog", "url": "http://x", "default_impact": 3}]
+    r1 = rss_ingest.ingest(feeds, db)
+    assert r1["new"] == 2 and r1["seen"] == 2
+    r2 = rss_ingest.ingest(feeds, db)          # same items -> nothing new
+    assert r2["new"] == 0 and r2["seen"] == 2
+    assert len(rss_ingest.load_ingested(db)) == 2
+    db.close()
+
+
+def test_merged_news_manual_wins(monkeypatch, tmp_path):
+    monkeypatch.setattr(rss_ingest, "get_text", lambda *a, **k: (_SAMPLE_RSS, ""))
+    db = Database(str(tmp_path / "m.db"))
+    rss_ingest.ingest([{"name": "DIA blog", "url": "http://x", "default_impact": 3}], db)
+    # Manual entry shares URL with ingested item 'x' (trailing slash) -> dedup.
+    config_news = [{
+        "url": "https://www.diadata.org/blog/post/x/", "title": "manual x",
+        "category": "RWA", "impact_score": 5,
+    }]
+    merged = reporting.merged_news(db, config_news)
+    urls = sorted(reporting._norm_url(n["url"]) for n in merged)
+    assert urls == ["https://www.diadata.org/blog/post/x",
+                    "https://www.diadata.org/blog/post/y"]   # x not duplicated
+    x = [n for n in merged if reporting._norm_url(n["url"]).endswith("/x")][0]
+    assert x["title"] == "manual x" and not x.get("ingested")  # manual won
+    db.close()
 
 
 def test_config_loaders_return_lists():
