@@ -18,5 +18,6 @@ exports/*.csv
 # Tooling
 .pytest_cache/
 .uv/
+uv.lock
 .ruff_cache/
 .DS_Store
