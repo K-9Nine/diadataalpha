@@ -160,7 +160,8 @@ more cautious**, not more bullish.
 ## 7. Known data limitations
 
 - ~~**TVS is a single manual reading** — no history.~~ **RESOLVED:** with the DefiLlama Pro key the tool now fetches the live per-oracle TVS series (1,833 days), so TVS *level, trend and oracle-market share* are all tracked. The live figure ($112.5M) is also **lower** than the earlier manual $148M reading.
-- **No fee/revenue data — still missing even with Pro.** DefiLlama's fees dataset doesn't cover oracles (`/api/summary/fees/dia` → 404), so the decisive usage→revenue metric is *not* available from DefiLlama Pro. It would need Dune / Token Terminal / on-chain accounting of Lasernet gas + oracle-call payments.
+- **No fee/revenue figure exists anywhere — and that's structural, not a sourcing gap.** Confirmed via DefiLlama (oracles aren't in the fees dataset; `/api/summary/fees/dia` → 404) *and* an independent 12-month sweep. The reason: during the grants phase DIA's oracles are **free** (up to 12 months across 20+ chains). Crucially, the value-capture mechanism **is designed but dormant** — DIA states *"network fees generated through increased oracle adoption are fed back into DIA Lasernet, incentivising stakers."* So the flywheel (oracle fees → Lasernet → stakers) is **built but switched off**. The re-rating trigger is therefore specific: **grants→paid conversion turning fee flow on**, with staking yield shifting from emission-funded to fee-funded. Nearest read: the **Jun–Jul 2026** window (first grant cohort matures + Jul 1 staking recalibration 30%→5–6%). Until then this line stays blank (needs Dune / Token Terminal / disclosed fee flow).
+- **No public token-unlock schedule.** Supply is fixed (200M premined 2020, deflationary/no minting; ~31M since burned → **168.82M total**, **119.68M circulating**). The real near-term overhang is therefore **~49M locked (~$6M at $0.12)** — *not* the "200M − 120M = 80M" some sources cite (that double-counts burns). Modest in dollar terms, but **no granular vesting/cliff schedule is published on any tracker** (Tokenomist/DefiLlama-unlocks don't list DIA), so the overhang is **unmodellable** — a tail risk and a minor maturity/governance flag for a $15M-mcap token.
 - **RWA count (20,000+) is DIA's own headline**, not independently verified; the free API only exposes a crypto-token floor.
 - **Staking/grants are manual** — accurate as of the research date, not live.
 - **Reach proxy remains in the tool** (now clearly labelled) because it shows *which* protocols touch DIA; it must not be read as secured value.
@@ -196,6 +197,16 @@ history and an independent 12-month news sweep. Findings:
   (Mar 2026) — DIA as oracle layer for institutional risk-rating + PoR of tokenised
   fixed-income/equity (Ethereum+Solana). Concrete institutional RWA infra, but
   still no disclosed AUM or fees.
+- **Team & key-person read.** Strategy is coherent and well-articulated by senior
+  leads (Hanson/BD, Marazas/Product) who speak fluent TradFi valuation (NAV,
+  mark-to-model, reserve verification) — the right toolkit for the institutional
+  pivot; clean two-product framing (Market = liquid, Value = illiquid/fundamental).
+  **Soft flag:** CEO (Weber) and CTO (Brack) have low public visibility over the last
+  12 months (comms delegated to core-team bylines), with co-founder Claudius the
+  external face. No departures (Weber spoke at the Jun-2026 AI Infra Summit), so
+  logged as a mild key-person/engagement risk, not a red flag. Notably, **no
+  founder/senior-team communication in 12 months mentions token value-capture or
+  fees** — confirming the monetization gap is strategic, not merely unannounced.
 
 **Net:** the scan reinforces the existing verdict — a quiet, legitimate,
 under-the-radar small-cap with a real (and increasingly institutional) product
