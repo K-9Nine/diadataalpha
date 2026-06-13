@@ -20,6 +20,7 @@ from dia_alpha_monitor import (
     coingecko,
     config_loader,
     defillama,
+    defillama_pro,
     dia_api,
     evm_oracle,
     feed_activity,
@@ -27,6 +28,7 @@ from dia_alpha_monitor import (
     reporting,
     rss_ingest,
 )
+from dia_alpha_monitor.models import today_str as _today
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import DIA_COINGECKO_ID, today_str, utcnow
 
@@ -152,6 +154,29 @@ def cmd_run(args) -> int:
         f"({proxy['n_resolved']}/{proxy['n_protocols']} resolved)"
     )
 
+    # B2. DefiLlama Pro: official oracle TVS history + DIA fees (if key set) --
+    if defillama_pro.have_key():
+        tvs_rows, tvs_err = defillama_pro.fetch_oracle_tvs_series("DIA", cache=db)
+        for r in tvs_rows:
+            db.upsert("oracle_tvs_history", r)
+        if tvs_err:
+            warnings.append(f"DefiLlama Pro oracle TVS: {tvs_err}")
+            console.print(f"[yellow]Oracle TVS (Pro): {tvs_err}[/yellow]")
+        else:
+            latest_tvs = db.latest_value("oracle_tvs_history", "tvs_usd")
+            console.print(
+                f"[green]Oracle TVS (Pro): ok[/green] {len(tvs_rows)} days, "
+                f"latest ${latest_tvs:,.0f}"
+            )
+        fees, ferr = defillama_pro.fetch_protocol_fees("dia", cache=db)
+        if not ferr and any(v is not None for v in fees.values()):
+            db.upsert("dia_fees", {"date": _today(), **fees})
+            console.print(f"[green]DIA fees (Pro): ok[/green] 24h=${fees.get('total_24h')}")
+        else:
+            console.print("[dim]DIA fees (Pro): not in DefiLlama fees dataset (expected for oracles)[/dim]")
+    else:
+        console.print("[dim]DefiLlama Pro: no DEFILLAMA_API_KEY — using manual TVS figure[/dim]")
+
     # F. Competitors ------------------------------------------------------
     competitors, cwarn = config_loader.load_competitors()
     if cwarn:
@@ -246,6 +271,8 @@ def cmd_export(args) -> int:
         "ingested_news",
         "lasernet_history",
         "market_history",
+        "oracle_tvs_history",
+        "dia_fees",
         "score_snapshots",
     ]
     written = []

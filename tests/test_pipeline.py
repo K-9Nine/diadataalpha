@@ -15,6 +15,7 @@ from dia_alpha_monitor import (
     coingecko,
     config_loader,
     defillama,
+    defillama_pro,
     dia_api,
     evm_oracle,
     feed_activity,
@@ -411,6 +412,48 @@ def test_lasernet_block_trend_from_history(tmp_path):
     block = reporting.lasernet_block(db)
     assert block["wow_today"] == pytest.approx((330 - 300) / 300 * 100)   # +10%
     assert block["monthly"] == pytest.approx((330 - 200) / 200 * 100)     # +65%
+    db.close()
+
+
+def test_defillama_pro_parses_oracle_series_dict_shape(monkeypatch):
+    # Shape A: chart keyed by timestamp -> {oracle: tvs}
+    monkeypatch.setenv("DEFILLAMA_API_KEY", "testkey")
+    payload = {"chart": {
+        "1700000000": {"Chainlink": 9e9, "DIA": 1.40e8},
+        "1700086400": {"Chainlink": 9e9, "DIA": 1.4823e8},
+    }}
+    monkeypatch.setattr(defillama_pro, "get_json", lambda *a, **k: (payload, ""))
+    rows, err = defillama_pro.fetch_oracle_tvs_series("DIA")
+    assert err == "" and len(rows) == 2
+    assert rows[-1]["tvs_usd"] == 1.4823e8        # newest last
+
+
+def test_defillama_pro_parses_oracle_series_list_shape(monkeypatch):
+    # Shape B: chart as list of [ts, {oracle: tvs}]
+    monkeypatch.setenv("DEFILLAMA_API_KEY", "testkey")
+    payload = {"chart": [[1700000000, {"DIA": 100.0}], [1700086400, {"DIA": 150.0}]]}
+    monkeypatch.setattr(defillama_pro, "get_json", lambda *a, **k: (payload, ""))
+    rows, err = defillama_pro.fetch_oracle_tvs_series("DIA")
+    assert err == "" and [r["tvs_usd"] for r in rows] == [100.0, 150.0]
+
+
+def test_defillama_pro_no_key_is_graceful(monkeypatch):
+    monkeypatch.delenv("DEFILLAMA_API_KEY", raising=False)
+    assert defillama_pro.have_key() is False
+    rows, err = defillama_pro.fetch_oracle_tvs_series("DIA")
+    assert rows == [] and "no DEFILLAMA_API_KEY" in err
+
+
+def test_oracle_tvs_block_prefers_live_over_manual(tmp_path):
+    db = Database(str(tmp_path / "tvs.db"))
+    # 31 days of live TVS history: 30d ago 100M, 7d ago 130M, today 148M
+    for ago, v in ((30, 100e6), (7, 130e6), (0, 148e6)):
+        d = (utcnow() - timedelta(days=ago)).strftime("%Y-%m-%d")
+        db.upsert("oracle_tvs_history", {"date": d, "tvs_usd": v})
+    block = reporting.oracle_tvs_block(db)
+    assert block["live"] is True
+    assert block["tvs"] == 148e6
+    assert block["wow"] == pytest.approx((148 - 130) / 130 * 100)
     db.close()
 
 
