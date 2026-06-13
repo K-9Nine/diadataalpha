@@ -13,6 +13,38 @@
 # impact_score then date). Verified from primary sources (researched 2026-06-12).
 
 news:
+  - date: "2026-03-12"
+    source: "Particula"
+    title: "Particula selects DIA as oracle infra for the Digital Asset Risk Passport (PDARP)"
+    url: "https://particula.io/blog/particula-selects-dia-as-oracle-infrastructure-for-the-digital-asset-risk-passport"
+    category: RWA
+    impact_score: 4
+    notes: "Strongest 'institutional pivot is real' evidence so far: DIA is the oracle layer delivering a third-party risk-rating + Proof-of-Reserve credential for tokenised fixed-income/equity into smart contracts, live on Ethereum+Solana (30+ networks planned). Institutional RWA infra, not just a rebrand. Still no disclosed AUM/fees."
+
+  - date: "2025-12-16"
+    source: "DIA blog"
+    title: "DIA partners with AltLayer to support its Rollup-as-a-Service platform"
+    url: "https://www.diadata.org/blog/post/dia-partners-with-altlayer-raas"
+    category: integration
+    impact_score: 3
+    notes: "DIA becomes a supported oracle for AltLayer RaaS — distribution channel (new rollups ship with DIA available), not direct TVS."
+
+  - date: "2025-12-19"
+    source: "DIA blog"
+    title: "DIA integrates with Sei to deliver verifiable oracle infrastructure"
+    url: "https://www.diadata.org/blog/post/dia-integrates-with-sei"
+    category: integration
+    impact_score: 3
+    notes: "Verifiable oracle infra on Sei. Chain footprint expansion; usage/TVS contribution unproven."
+
+  - date: "2025-11-19"
+    source: "DIA blog"
+    title: "DIA price oracles enable diverse collateral support for Bit Protocol on Base"
+    url: "https://www.diadata.org/blog/post/dia-bit-protocol-base-collateral"
+    category: integration
+    impact_score: 3
+    notes: "Collateral pricing for Bit Protocol (stablecoin) on Base. Small protocol; incremental."
+
   - date: "2026-05-19"
     source: "DIA blog"
     title: "Proof of Reserves for tGBP: pricing by backing, not by trading"
