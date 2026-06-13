@@ -93,6 +93,42 @@ CREATE TABLE IF NOT EXISTS dia_oracle_snapshots (
     quoted_assets INTEGER, exchange_sources INTEGER, active_scrapers INTEGER,
     signature TEXT, source TEXT, error TEXT
 );
+
+CREATE TABLE IF NOT EXISTS feed_activity_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    total_feeds INTEGER, rwa_feeds INTEGER, crypto_feeds INTEGER,
+    n_blockchains INTEGER, active_sources INTEGER,
+    source TEXT, error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS oracle_activity_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    chain TEXT, oracle_address TEXT, rpc_url TEXT,
+    update_count INTEGER, latest_block INTEGER,
+    from_block INTEGER, to_block INTEGER,
+    source TEXT, error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS lasernet_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    total_transactions INTEGER, transactions_today INTEGER,
+    total_blocks INTEGER, total_addresses INTEGER,
+    source TEXT, error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ingested_news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_seen TEXT NOT NULL,
+    date TEXT,
+    title TEXT, url TEXT UNIQUE,
+    source TEXT, category TEXT, impact_score INTEGER
+);
 """
 
 
@@ -157,6 +193,28 @@ class Database:
     def all_rows(self, table: str) -> list[sqlite3.Row]:
         cur = self.conn.execute(f"SELECT * FROM {table} ORDER BY id ASC")
         return cur.fetchall()
+
+    def history_span_days(self, table: str, where: str = "", params: tuple = ()) -> float:
+        """Days between the earliest and latest ``date`` in a snapshot table.
+
+        Used to gate trend metrics that are only meaningful with enough history
+        (e.g. require >= 7 days before scoring weekly TVL change). Returns 0.0
+        when the table has zero or one distinct date.
+        """
+        from datetime import date as _date
+
+        sql = f"SELECT MIN(date) AS mn, MAX(date) AS mx FROM {table}"
+        if where:
+            sql += f" WHERE {where}"
+        row = self.conn.execute(sql, params).fetchone()
+        if not row or not row["mn"] or not row["mx"]:
+            return 0.0
+        try:
+            mn = _date.fromisoformat(str(row["mn"])[:10])
+            mx = _date.fromisoformat(str(row["mx"])[:10])
+        except ValueError:
+            return 0.0
+        return float((mx - mn).days)
 
     def nearest_before(
         self, table: str, days_ago: int, value_col: str, where: str = "", params: tuple = ()

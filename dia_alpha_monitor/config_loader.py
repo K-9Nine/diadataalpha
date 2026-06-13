@@ -63,6 +63,25 @@ def load_staking() -> tuple[list[dict], str]:
     return list(items or []), warn
 
 
+def load_oracles() -> tuple[list[dict], str]:
+    data, warn = _load_yaml("oracles.yaml")
+    items = (data or {}).get("chains", []) if isinstance(data, dict) else (data or [])
+    return list(items or []), warn
+
+
+def load_feeds_meta() -> tuple[dict, str]:
+    """Manually-sourced feed figures (e.g. DIA's published RWA asset count)."""
+    data, warn = _load_yaml("feeds.yaml")
+    return (data if isinstance(data, dict) else {}), warn
+
+
+def load_news_feeds() -> tuple[list[dict], str]:
+    """RSS/Atom feeds to auto-ingest into the news tracker."""
+    data, warn = _load_yaml("news_feeds.yaml")
+    items = (data or {}).get("feeds", []) if isinstance(data, dict) else (data or [])
+    return list(items or []), warn
+
+
 # -- derived metrics -------------------------------------------------------
 
 def _parse_date(value: Any) -> datetime | None:

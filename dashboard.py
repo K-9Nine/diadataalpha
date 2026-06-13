@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover
         "  uv pip install -e '.[dashboard]'   (or)   pip install streamlit"
     )
 
-from dia_alpha_monitor import dia_api, reporting, valuation
+from dia_alpha_monitor import alerts, dia_api, reporting, valuation
 from dia_alpha_monitor.db import Database
 
 DB_PATH = os.environ.get("DIA_DB_PATH", "dia_alpha_monitor.db")
@@ -75,6 +75,50 @@ if oracle.get("present"):
               f"{oracle['active_scrapers']}/{oracle['exchange_sources']}"
               if oracle["exchange_sources"] is not None else "n/a")
     st.caption("DIA's own signed price + coverage — a primary-source cross-check on the market data.")
+
+# v2: feed coverage, on-chain oracle activity, week-over-week alerts
+fired = alerts.week_over_week_alerts(db)
+if fired:
+    st.error("**[ALERT] >10% week-over-week:**  " + "   ".join(
+        f"{'▲' if a['direction']=='up' else '▼'} {a['metric']} {a['pct']:+.1f}%" for a in fired
+    ))
+
+feeds = reporting.feed_activity_block(db)
+if feeds.get("present") and feeds["total_feeds"] is not None:
+    st.subheader("Feed coverage (source: api.diadata.org)")
+    f1, f2, f3, f4 = st.columns(4)
+    f1.metric("Total feeds", f"{feeds['total_feeds']:,}")
+    f2.metric("Crypto / RWA*", f"{feeds['crypto_feeds']:,} / {feeds['rwa_feeds']}")
+    f3.metric("Blockchains", feeds["n_blockchains"])
+    f4.metric("Active sources", feeds["active_sources"])
+    st.caption("*RWA is a floor — the free REST endpoint is crypto-token-centric.")
+
+lnet = reporting.lasernet_block(db)
+if lnet.get("present") and lnet["transactions_today"] is not None:
+    st.subheader("Lasernet oracle throughput (source: explorer.diadata.org)")
+    l1, l2, l3 = st.columns(3)
+    l1.metric("Transactions today", f"{lnet['transactions_today']:,}",
+              f"{lnet['wow_today']:+.1f}% WoW" if lnet["wow_today"] is not None else None)
+    l2.metric("Total transactions", f"{lnet['total_transactions']:,}")
+    l3.metric("Addresses", f"{lnet['total_addresses']:,}")
+    st.caption("Lasernet is DIA's oracle rollup — throughput ≈ oracle operations (real usage signal).")
+
+oa = reporting.oracle_activity_block(db)
+if oa.get("present"):
+    st.subheader("On-chain DIA oracle activity (public RPC — real usage signal)")
+    st.dataframe(pd.DataFrame(oa["chains"])[
+        ["chain", "oracle_address", "update_count", "from_block", "to_block", "error"]
+    ], use_container_width=True)
+    st.caption("0 updates can be legitimate — legacy push-oracles are quiet under the Lasernet pull model.")
+
+if agg.get("grant_funnel"):
+    gfn = agg["grant_funnel"]
+    rate = gfn.get("to_mainnet_rate")
+    st.caption(
+        f"Grant funnel — to-mainnet conversion: "
+        f"{('%.0f%%' % (rate*100)) if rate is not None else 'n/a'}; "
+        f"stale (>{gfn['stale_days']}d pre-mainnet): {gfn['n_stale']}"
+    )
 
 st.subheader("Alpha score breakdown")
 st.dataframe(pd.DataFrame(agg["categories"]), use_container_width=True)

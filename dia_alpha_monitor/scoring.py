@@ -45,6 +45,24 @@ def _neutral(category: str, reason: str) -> dict[str, Any]:
     }
 
 
+def _insufficient(category: str, reason: str) -> dict[str, Any]:
+    """A trend category that lacks enough history to be scored honestly.
+
+    Awards the neutral baseline (so the total isn't tanked) but is flagged
+    distinctly so the report can show ``INSUFFICIENT DATA`` instead of a
+    misleading trend number.
+    """
+    mx = CATEGORY_MAX[category]
+    return {
+        "category": category,
+        "points": round(mx * NEUTRAL_FRACTION, 2),
+        "max": mx,
+        "rationale": f"INSUFFICIENT DATA - {reason}",
+        "gap": True,
+        "insufficient": True,
+    }
+
+
 def _result(category: str, points: float, rationale: str, gap: bool = False) -> dict[str, Any]:
     mx = CATEGORY_MAX[category]
     return {
@@ -80,11 +98,25 @@ def score_momentum(
     return _result("momentum", pts, "; ".join(parts))
 
 
+MIN_TREND_HISTORY_DAYS = 7
+
+
 def score_tvl_growth(
     weekly_change_pct: Optional[float],
     monthly_change_pct: Optional[float],
     n_resolved: int,
+    history_days: Optional[float] = None,
 ) -> dict[str, Any]:
+    # Trend metrics need real history. Until the TVL series spans at least a
+    # week, refuse to score a change figure (which would otherwise read a
+    # misleading ~0% off two near-adjacent snapshots).
+    if history_days is not None and history_days < MIN_TREND_HISTORY_DAYS:
+        if n_resolved <= 0:
+            return _neutral("tvl_growth", "no DIA-linked TVL resolved")
+        return _insufficient(
+            "tvl_growth",
+            f"need >={MIN_TREND_HISTORY_DAYS}d of TVL history, have {history_days:.0f}d",
+        )
     if weekly_change_pct is None and monthly_change_pct is None:
         if n_resolved > 0:
             # We have TVL but no history yet (first run).
@@ -184,9 +216,11 @@ def score_valuation_discount(best_discount: Optional[float]) -> dict[str, Any]:
 def aggregate(categories: list[dict[str, Any]]) -> dict[str, Any]:
     total = round(sum(c["points"] for c in categories), 2)
     gaps = [c["category"] for c in categories if c.get("gap")]
+    insufficient = [c["category"] for c in categories if c.get("insufficient")]
     return {
         "total": total,
         "max": TOTAL_MAX,
         "categories": categories,
         "data_gaps": gaps,
+        "insufficient": insufficient,
     }

@@ -1,0 +1,20 @@
+# RSS/Atom feeds auto-ingested into the news tracker (rss_ingest.py).
+#
+# Items are fetched, classified by keyword, de-duplicated by URL, and stored in
+# the ingested_news table — they then merge with the manual config/news.yaml in
+# the report (manual entries win on conflict).
+#
+# TRUSTED-SOURCES POLICY: keep this list to DIA-official feeds (and other feeds
+# you explicitly trust). Each item records its source so provenance is visible.
+#
+# Fields per feed:
+#   name           : source label shown in the report
+#   url            : RSS/Atom feed URL
+#   default_impact : baseline impact_score (1-5); the classifier may bump it
+#   trusted        : true for DIA-official / first-party feeds
+
+feeds:
+  - name: "DIA blog"
+    url: "https://www.diadata.org/blog/feed/"
+    default_impact: 3
+    trusted: true

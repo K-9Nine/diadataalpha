@@ -1,0 +1,11 @@
+# Manually-sourced DIA feed/coverage figures that the free APIs do NOT expose.
+#
+# Why this exists: the public /v1/quotedAssets endpoint is crypto-token-centric,
+# so feed_activity.py can only count a *floor* of RWA feeds (e.g. ~2). DIA does
+# publish a headline RWA asset count, so we record it here as a clearly-sourced
+# manual figure to complement the live floor. Update from DIA's own pages.
+
+rwa_assets_reported: 20000
+rwa_source: "https://www.diadata.org/blockchain-oracle-grant/"
+rwa_as_of: "2026-06-12"
+rwa_note: "DIA grant page: 20,000+ supported RWA assets (stocks, FX, commodities, ETFs, bonds)."
