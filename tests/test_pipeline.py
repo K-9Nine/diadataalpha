@@ -328,6 +328,25 @@ def test_rss_parse_and_classify():
     assert 1 <= staking["impact_score"] <= 5
 
 
+def test_catalyst_detection_and_impact_boost():
+    # Thesis-critical headlines are flagged and floated to impact 5...
+    for title in (
+        "DIA activates fee switch: oracle revenue flows to stakers",
+        "BlackRock vault adopts DIA Value for tokenised collateral",
+        "First grant graduates to a paying customer",
+        "DIA introduces token buyback from protocol revenue",
+    ):
+        assert rss_ingest.is_catalyst(title) is True
+        _, impact = rss_ingest._classify(title, default_impact=1)
+        assert impact == 5
+    # ...ordinary integration/RWA news is not a catalyst.
+    for title in (
+        "DIA Powers Fair Value Pricing for hemiBTC on Hemi Network",
+        "Update on DIA Staking",
+    ):
+        assert rss_ingest.is_catalyst(title) is False
+
+
 def test_rss_ingest_dedups(monkeypatch, tmp_path):
     monkeypatch.setattr(rss_ingest, "get_text", lambda *a, **k: (_SAMPLE_RSS, ""))
     db = Database(str(tmp_path / "n.db"))

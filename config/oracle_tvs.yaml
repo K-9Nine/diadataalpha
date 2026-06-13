@@ -8,10 +8,15 @@
 # so we record the public figure here manually.
 #
 # VERIFY FREE (no account) at: https://defillama.com/oracles/DIA
-# Refresh periodically; DefiLlama Pro would automate this + add history.
+#
+# NOTE: this is now a FALLBACK only. With a DEFILLAMA_API_KEY set, the tool fetches
+# the live per-oracle TVS series (+ history) from the Pro /api/oracles endpoint
+# (see defillama_pro.py) and the report prefers it over this manual figure. Keep
+# this roughly current for runs without a key. Values below refreshed from the
+# live Pro reading on the as_of date.
 
-defillama_tvs_usd: 148230000
+defillama_tvs_usd: 112480000
 source: "https://defillama.com/oracles/DIA"
 as_of: "2026-06-13"
-top_protocols: "Zest (~48%), Rezerve Lending (Ethereum), FortiFi (Avalanche)"
-note: "Real value DIA's oracles secure. Compare to mcap for an adoption-vs-price read."
+top_protocols: "Zest V2 ~63% (Stacks), Hydration Lending ~25% (Polkadot); top-2 ≈ 88%"
+note: "Real value DIA's oracles secure. Compare to mcap for an adoption-vs-price read. Highly concentrated — see ANALYSIS.md §3."

@@ -673,12 +673,23 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
         )
     )
     if nm["top_high_impact"]:
-        console.print("[dim]  Top recent high-impact items ([cyan]rss[/cyan] = auto-ingested):[/dim]")
+        console.print(
+            "[dim]  Top recent high-impact items "
+            "([cyan]rss[/cyan] = auto-ingested; [bold magenta]CATALYST[/bold magenta] = thesis-critical):[/dim]"
+        )
+        catalysts = [n for n in nm["top_high_impact"] if rss_ingest.is_catalyst(n.get("title", ""))]
         for n in nm["top_high_impact"][:10]:
             tag = " [cyan]\\[rss][/cyan]" if n.get("ingested") else ""
+            cat = " [bold magenta]\\[CATALYST][/bold magenta]" if rss_ingest.is_catalyst(n.get("title", "")) else ""
             console.print(
                 f"  • [{n.get('impact_score','?')}/5] {n.get('date','?')} "
-                f"[{n.get('category','?')}]{tag} {n.get('title','?')}  {n.get('url','')}"
+                f"[{n.get('category','?')}]{tag}{cat} {n.get('title','?')}  {n.get('url','')}"
+            )
+        if not catalysts:
+            console.print(
+                "[dim]  [magenta]Catalyst watch:[/magenta] no thesis-critical headline yet. "
+                "Watching for monetisation (fee switch / revenue / buyback / burn), "
+                "institutional/vault adoption, and grant→paid conversion.[/dim]"
             )
 
     # 6. Staking / Lasernet
