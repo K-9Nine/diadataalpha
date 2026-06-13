@@ -13,6 +13,38 @@
 # impact_score then date). Verified from primary sources (researched 2026-06-12).
 
 news:
+  - date: "2026-05-19"
+    source: "DIA blog"
+    title: "Proof of Reserves for tGBP: pricing by backing, not by trading"
+    url: "https://www.diadata.org/blog/post/proof-of-reserves-for-tgbp"
+    category: RWA
+    impact_score: 4
+    notes: "DIA xValue Reserve-Backing prices tokenised GBP from provable reserves rather than thin market trades — extends the fair-value/PoR RWA niche beyond BTC stablecoins."
+
+  - date: "2026-04-24"
+    source: "DIA blog"
+    title: "Pricing infrastructure for Litecoin's first EVM rollup (LitVM)"
+    url: "https://www.diadata.org/blog/post/dia-litvm-oracle-integration"
+    category: integration
+    impact_score: 3
+    notes: "DIA is the oracle layer for LitVM, Litecoin's first EVM rollup — new chain footprint; usage/TVS contribution unproven."
+
+  - date: "2026-04-03"
+    source: "DIA blog"
+    title: "How DeFi prices collateral is now a macro policy question"
+    url: "https://www.diadata.org/blog/post/imf-tokenized-finance-collateral-pricing"
+    category: DeFi
+    impact_score: 3
+    notes: "Thought-leadership tied to IMF/tokenised-finance framing; positions DIA Value (intrinsic/fair-value pricing) for institutional collateral. Narrative, not adoption."
+
+  - date: "2026-02-26"
+    source: "DIA blog"
+    title: "A New DIA for a New DeFi — pivot to institutional DeFi"
+    url: "https://www.diadata.org/blog/post/a-new-dia-for-a-new-defi"
+    category: DeFi
+    impact_score: 5
+    notes: "Strategic-pivot/rebrand post: client base moved toward INSTITUTIONAL DeFi — vault platforms, stablecoin reserve verification, tokenised securities. 2026 focus is DeFi VAULTS. Thesis-defining direction; watch for the named customers/fees that would validate it."
+
   - date: "2026-06-05"
     source: "DIA blog"
     title: "DIA staking enters next phase — yield recalibrates to ~5-6% APY on Jul 1"

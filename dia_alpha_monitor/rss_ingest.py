@@ -33,6 +33,28 @@ _CATEGORY_RULES = [
 
 _MAJOR_MARKERS = ("launch", "mainnet", "first", "unveil", "goes live", "live:")
 
+# CATALYST markers — the thesis-critical signals an upside re-rating actually needs:
+# (a) MONETISATION — usage finally flowing to the token (the missing piece today);
+# (b) MAJOR ADOPTION — institutional / vault / named large customer;
+# (c) GRANT->PAID conversion — free-trial oracles becoming paying customers.
+# A match floats the item to the top (impact 5) and tags it [CATALYST] in the report.
+_CATALYST_KEYWORDS = (
+    # (a) monetisation / value capture
+    "fee switch", "fee-switch", "revenue", "revenue share", "buyback", "buy back",
+    "buy-back", "burn", "fee distribution", "fee sharing", "monetis", "monetiz",
+    "paying customer", "paid plan", "paid tier", "fees from",
+    # (b) major / institutional adoption
+    "institutional", "tradfi", "asset manager", "blackrock", "vault",
+    # (c) grant -> paid conversion
+    "grant conversion", "converts to paid", "graduat", "now paying",
+)
+
+
+def is_catalyst(title: str) -> bool:
+    """True if a headline matches a thesis-critical catalyst keyword (see above)."""
+    t = (title or "").lower()
+    return any(k in t for k in _CATALYST_KEYWORDS)
+
 
 def _classify(title: str, default_impact: int) -> tuple[str, int]:
     t = (title or "").lower()
@@ -46,6 +68,8 @@ def _classify(title: str, default_impact: int) -> tuple[str, int]:
         impact += 1
     if any(m in t for m in _MAJOR_MARKERS):
         impact += 1
+    if is_catalyst(title):
+        impact = 5  # thesis-critical -> always surface at the top
     return category, max(1, min(5, impact))
 
 
