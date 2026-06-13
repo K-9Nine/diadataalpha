@@ -286,13 +286,55 @@ def test_lasernet_parses_string_counters(monkeypatch):
         lasernet, "get_json",
         lambda *a, **k: (
             {"total_transactions": "57441909", "transactions_today": "313152",
-             "total_blocks": "28663051", "total_addresses": "2019"}, ""),
+             "total_blocks": "28663051", "total_addresses": "2019",
+             "gas_used_today": "124137027223",
+             "gas_prices": {"slow": 0.01, "average": 0.01, "fast": 0.01},
+             "network_utilization_percentage": 7.1e-08}, ""),
     )
     snap = lasernet.fetch_lasernet()
     assert snap.transactions_today == 313152
     assert snap.total_transactions == 57441909
     assert snap.total_blocks == 28663051
+    assert snap.gas_used_today == 124137027223
+    assert snap.gas_price_gwei == 0.01
+    assert snap.network_utilization == pytest.approx(7.1e-08)
     assert snap.error == ""
+
+
+def test_lasernet_monetization_signal_dormant():
+    # Current reality: ~124B gas/day at 0.01 Gwei -> ~1.24 DIA/day -> ~$0.15/day.
+    sig = lasernet.monetization_signal(
+        gas_used_today=124_137_027_223, gas_price_gwei=0.01,
+        network_utilization=7.1e-08, dia_price=0.122,
+    )
+    assert sig["fee_dia_day"] == pytest.approx(1.2414, rel=1e-3)
+    assert sig["fee_usd_year"] < lasernet.MATERIALITY_USD_YEAR
+    assert sig["inflection"] is False
+
+
+def test_lasernet_monetization_signal_inflects_on_materiality_and_baseline():
+    # A 10x gas jump that also clears the materiality threshold trips the wire.
+    sig = lasernet.monetization_signal(
+        gas_used_today=10_000_000_000_000, gas_price_gwei=5.0,
+        network_utilization=0.4, dia_price=0.122, baseline_gas_used=124_000_000_000,
+    )
+    assert sig["inflection"] is True
+    assert any("baseline" in r for r in sig["reasons"])
+    assert sig["fee_usd_year"] >= lasernet.MATERIALITY_USD_YEAR
+
+
+def test_lasernet_monetization_block_uses_latest_snapshot(tmp_path):
+    db = Database(str(tmp_path / "mon.db"))
+    db.insert("lasernet_snapshots", {
+        "date": today_str(), "ts": utcnow().isoformat(), "total_transactions": 57_000_000,
+        "transactions_today": 313152, "total_blocks": 28_000_000, "total_addresses": 2000,
+        "gas_used_today": 124_137_027_223, "gas_price_gwei": 0.01,
+        "network_utilization": 7.1e-08, "source": "t", "error": "",
+    })
+    block = reporting.lasernet_monetization_block(db, dia_price=0.122)
+    assert block is not None and block["inflection"] is False
+    assert block["fee_usd_day"] == pytest.approx(1.2414 * 0.122, rel=1e-3)
+    db.close()
 
 
 def test_lasernet_graceful_on_failure(monkeypatch):

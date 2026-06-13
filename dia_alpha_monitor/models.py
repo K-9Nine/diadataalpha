@@ -179,6 +179,12 @@ class LasernetSnapshot:
     transactions_today: Optional[int] = None
     total_blocks: Optional[int] = None
     total_addresses: Optional[int] = None
+    # Monetization tripwire inputs: daily gas burned, the prevailing gas price,
+    # and network utilization. Today these imply a trivial, subsidized fee surface
+    # (~$0.14/day); a sustained jump is the earliest on-chain sign of grants->paid.
+    gas_used_today: Optional[int] = None
+    gas_price_gwei: Optional[float] = None
+    network_utilization: Optional[float] = None
     source: str = "lasernet/blockscout"
     error: str = ""
 

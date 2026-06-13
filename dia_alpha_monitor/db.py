@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS lasernet_snapshots (
     ts TEXT NOT NULL,
     total_transactions INTEGER, transactions_today INTEGER,
     total_blocks INTEGER, total_addresses INTEGER,
+    gas_used_today INTEGER, gas_price_gwei REAL, network_utilization REAL,
     source TEXT, error TEXT
 );
 
@@ -158,7 +159,25 @@ class Database:
         self.conn = sqlite3.connect(path)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    # Columns added after a table first shipped — CREATE TABLE IF NOT EXISTS won't
+    # add them to a pre-existing DB, so add them idempotently here (never crashes).
+    _ADDED_COLUMNS = {
+        "lasernet_snapshots": {
+            "gas_used_today": "INTEGER",
+            "gas_price_gwei": "REAL",
+            "network_utilization": "REAL",
+        },
+    }
+
+    def _migrate(self) -> None:
+        for table, cols in self._ADDED_COLUMNS.items():
+            existing = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+            for col, decl in cols.items():
+                if col not in existing:
+                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
 
     def close(self) -> None:
         self.conn.close()

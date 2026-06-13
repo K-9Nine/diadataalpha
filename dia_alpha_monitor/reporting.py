@@ -11,6 +11,7 @@ All rendering uses ``rich``. Proxy/manual/stale data is explicitly labelled.
 from __future__ import annotations
 
 import json
+import statistics
 from typing import Any, Optional
 
 from rich.console import Console
@@ -22,6 +23,7 @@ from dia_alpha_monitor import (
     config_loader,
     dia_api,
     grants as grant_analysis,
+    lasernet,
     rss_ingest,
     scoring,
     valuation,
@@ -214,6 +216,27 @@ def lasernet_block(db: Database) -> dict[str, Any]:
         "error": row["error"],
         "date": row["date"],
     }
+
+
+def lasernet_monetization_block(db: Database, dia_price: Optional[float]) -> Optional[dict]:
+    """Lasernet gas-fee 'monetization tripwire' — the earliest on-chain signal of
+    the grants->paid transition (see lasernet.monetization_signal).
+
+    Returns ``None`` until a Lasernet snapshot carries gas data. The baseline for
+    inflection detection is the median daily gas usage of prior snapshots (needs
+    >=3 so a single noisy day can't trip the wire).
+    """
+    latest = db.latest("lasernet_snapshots")
+    if latest is None or latest["gas_used_today"] is None:
+        return None
+    prior = [r["gas_used_today"] for r in db.all_rows("lasernet_snapshots")[:-1] if r["gas_used_today"]]
+    baseline = int(statistics.median(prior)) if len(prior) >= 3 else None
+    sig = lasernet.monetization_signal(
+        latest["gas_used_today"], latest["gas_price_gwei"],
+        latest["network_utilization"], dia_price, baseline_gas_used=baseline,
+    )
+    sig["date"] = latest["date"]
+    return sig
 
 
 def oracle_activity_block(db: Database) -> dict[str, Any]:
@@ -714,6 +737,35 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
     else:
         body = "[yellow]No staking snapshot yet — add entries to config/staking_snapshots.yaml[/yellow]"
     console.print(Panel(body, title="6. Staking / Lasernet (manual snapshot)", border_style="magenta"))
+
+    # 6b. Lasernet monetization tripwire — earliest on-chain sign of grants->paid
+    mon = lasernet_monetization_block(db, market.get("price"))
+    if mon is not None:
+        fee_day = mon["fee_usd_day"]
+        fee_yr = mon["fee_usd_year"]
+        util = mon["network_utilization"]
+        fee_day_s = f"${fee_day:,.2f}" if fee_day is not None else "n/a"
+        fee_yr_s = f"${fee_yr:,.0f}" if fee_yr is not None else "n/a"
+        dia_day_s = f"{mon['fee_dia_day']:.2f} DIA" if mon["fee_dia_day"] is not None else "n/a"
+        util_s = f"{util:.2e}%" if util is not None else "n/a"
+        if mon["inflection"]:
+            verdict = f"[bold red]⚠ POSSIBLE MONETIZATION INFLECTION[/bold red] — {'; '.join(mon['reasons'])}"
+        else:
+            verdict = (
+                "[dim]DORMANT (subsidized): gas paid by feeders/protocol, not customers — "
+                "no fee inflection. The bull case needs this to turn on (grants→paid).[/dim]"
+            )
+        base_s = f"   baseline gas/day: {mon['baseline_gas_used']:,}" if mon["baseline_gas_used"] else "   (baseline: <3 snapshots yet)"
+        console.print(
+            Panel(
+                f"Lasernet gas fees: [bold]{dia_day_s}/day[/bold] ≈ {fee_day_s}/day "
+                f"(~{fee_yr_s}/yr)   network utilization: {util_s}{base_s}\n"
+                f"As of {mon['date']} — this is INTERNAL network gas, NOT customer oracle revenue.\n"
+                f"{verdict}",
+                title="6b. Lasernet Monetization Tripwire (on-chain)",
+                border_style="red" if mon["inflection"] else "magenta",
+            )
+        )
 
     # 7. Competitor comparison
     if comp["present"]:
