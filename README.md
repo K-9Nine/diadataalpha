@@ -36,7 +36,12 @@ for that.
 - **Lasernet throughput** (`explorer.diadata.org`, Blockscout, no key): daily
   transaction count on DIA's oracle rollup — where oracle activity *actually*
   happens. Since Lasernet is a purpose-built oracle rollup, its throughput ≈
-  oracle operations, the strongest trustless usage signal in the tool.
+  oracle operations, the strongest trustless usage signal in the tool. **~31
+  days of daily history are backfilled**, so a real 7d/30d throughput trend is
+  available from the first run (no waiting for snapshots to accumulate).
+- **Backfilled price history** (CoinGecko `market_chart`): ~90 days of daily
+  price/market-cap/volume, so momentum charts and trends have real history
+  immediately.
 - **Grant funnel analysis**: announced → testnet → mainnet conversion rates,
   plus a flag for **stale grants** stuck pre-mainnet for >90 days.
 - **[ALERT] banner**: any tracked metric moving **>10% week-over-week** is
@@ -164,7 +169,7 @@ python -m dia_alpha_monitor export --out /tmp # custom directory
 One CSV per table: `market_snapshots`, `dia_oracle_snapshots`,
 `feed_activity_snapshots`, `oracle_activity_snapshots`, `lasernet_snapshots`,
 `tvl_snapshots`, `tvl_proxy`, `competitor_snapshots`, `staking_snapshots`,
-`ingested_news`, `score_snapshots`.
+`ingested_news`, `lasernet_history`, `market_history`, `score_snapshots`.
 
 ---
 

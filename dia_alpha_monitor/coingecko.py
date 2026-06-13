@@ -9,6 +9,7 @@ is never required.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from dia_alpha_monitor.http_client import get_json
@@ -71,6 +72,46 @@ def fetch_market(coingecko_id: str, cache=None) -> tuple[MarketSnapshot, str]:
     snap.change_7d = row.get("price_change_percentage_7d_in_currency")
     snap.change_30d = row.get("price_change_percentage_30d_in_currency")
     return snap, ""
+
+
+def fetch_market_chart(coingecko_id: str, days: int = 90, cache=None) -> tuple[list[dict], str]:
+    """Daily price/market-cap/volume history for one coin.
+
+    The free endpoint returns hourly points for a 90-day window, so we collapse
+    to one row per date (last point of each day). Returns ``([{date, price,
+    market_cap, volume}], error)`` — backfills real momentum history from run #1.
+    """
+    params: dict[str, Any] = {"vs_currency": "usd", "days": days}
+    key = os.environ.get("COINGECKO_API_KEY")
+    if key:
+        params["x_cg_demo_api_key"] = key
+    data, err = get_json(
+        f"{BASE}/coins/{coingecko_id}/market_chart",
+        params=params,
+        cache=cache,
+        cache_source="coingecko",
+        cache_key=f"chart:{coingecko_id}:{days}",
+    )
+    if err or not isinstance(data, dict):
+        return [], err or "no data"
+
+    def _by_date(series):
+        out: dict[str, float] = {}
+        for point in series or []:
+            if not isinstance(point, list) or len(point) < 2:
+                continue
+            d = datetime.fromtimestamp(point[0] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+            out[d] = point[1]  # last point of the day wins
+        return out
+
+    prices = _by_date(data.get("prices"))
+    caps = _by_date(data.get("market_caps"))
+    vols = _by_date(data.get("total_volumes"))
+    rows = [
+        {"date": d, "price": prices[d], "market_cap": caps.get(d), "volume": vols.get(d)}
+        for d in sorted(prices)
+    ]
+    return rows, ""
 
 
 def fetch_competitors(

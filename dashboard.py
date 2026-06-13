@@ -102,6 +102,9 @@ if lnet.get("present") and lnet["transactions_today"] is not None:
     l2.metric("Total transactions", f"{lnet['total_transactions']:,}")
     l3.metric("Addresses", f"{lnet['total_addresses']:,}")
     st.caption("Lasernet is DIA's oracle rollup — throughput ≈ oracle operations (real usage signal).")
+    lh = _df("lasernet_history")
+    if not lh.empty:
+        st.line_chart(lh.set_index("date")[["transactions_count"]])
 
 oa = reporting.oracle_activity_block(db)
 if oa.get("present"):
@@ -125,10 +128,14 @@ st.dataframe(pd.DataFrame(agg["categories"]), use_container_width=True)
 if agg["data_gaps"]:
     st.warning("Data gaps (neutral-scored): " + ", ".join(agg["data_gaps"]))
 
-st.subheader("Market history")
-mdf = _df("market_snapshots")
+st.subheader("Price history (90d, backfilled)")
+mdf = _df("market_history")
 if not mdf.empty:
-    st.line_chart(mdf.set_index("ts")[["price"]])
+    st.line_chart(mdf.set_index("date")[["price"]])
+else:
+    mdf = _df("market_snapshots")
+    if not mdf.empty:
+        st.line_chart(mdf.set_index("ts")[["price"]])
 
 st.subheader("DIA-linked TVL proxy history")
 pdf = _df("tvl_proxy")

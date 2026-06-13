@@ -164,21 +164,28 @@ def feed_activity_block(db: Database) -> dict[str, Any]:
 
 
 def lasernet_block(db: Database) -> dict[str, Any]:
-    """Latest Lasernet throughput reading + week-over-week change if available."""
+    """Latest Lasernet throughput + 7d/30d daily-tx trend from backfilled history."""
     row = db.latest("lasernet_snapshots")
     if row is None:
         return {"present": False}
-    wow_today = None
-    if db.history_span_days("lasernet_snapshots") >= scoring.MIN_TREND_HISTORY_DAYS:
-        prev = db.nearest_before("lasernet_snapshots", 7, "transactions_today")
-        wow_today = _pct_change(row["transactions_today"], prev)
+    # Real trend comes from the backfilled daily-tx chart (lasernet_history),
+    # which spans ~31 days from run #1 — no need to wait for our own snapshots.
+    wow_today = monthly = None
+    hist_days = db.history_span_days("lasernet_history")
+    latest_daily = db.latest_value("lasernet_history", "transactions_count")
+    if latest_daily is not None and hist_days >= scoring.MIN_TREND_HISTORY_DAYS:
+        wow_today = _pct_change(latest_daily, db.nearest_before("lasernet_history", 7, "transactions_count"))
+        monthly = _pct_change(latest_daily, db.nearest_before("lasernet_history", 30, "transactions_count"))
     return {
         "present": True,
         "total_transactions": row["total_transactions"],
         "transactions_today": row["transactions_today"],
         "total_blocks": row["total_blocks"],
         "total_addresses": row["total_addresses"],
+        "latest_daily_tx": latest_daily,
+        "history_days": hist_days,
         "wow_today": wow_today,
+        "monthly": monthly,
         "error": row["error"],
         "date": row["date"],
     }
@@ -539,14 +546,17 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
     # 3c. Lasernet throughput — where DIA oracle activity actually happens
     lnet = lasernet_block(db)
     if lnet.get("present") and lnet["transactions_today"] is not None:
-        wow = (
-            f"   WoW: {_pct(lnet['wow_today'])}"
-            if lnet["wow_today"] is not None
-            else "   WoW: [dim]INSUFFICIENT DATA (need ≥7d)[/dim]"
-        )
+        if lnet["wow_today"] is not None:
+            trend = (
+                f"   daily-tx trend: 7d {_pct(lnet['wow_today'])}   "
+                f"30d {_pct(lnet['monthly'])}  "
+                f"[dim]({lnet['history_days']:.0f}d history)[/dim]"
+            )
+        else:
+            trend = "   trend: [dim]INSUFFICIENT DATA (need ≥7d)[/dim]"
         console.print(
             Panel(
-                f"Transactions today: [bold]{lnet['transactions_today']:,}[/bold]{wow}\n"
+                f"Transactions today: [bold]{lnet['transactions_today']:,}[/bold]{trend}\n"
                 f"Total transactions: {lnet['total_transactions']:,}   "
                 f"blocks: {lnet['total_blocks']:,}   addresses: {lnet['total_addresses']:,}\n"
                 f"[dim]Lasernet is DIA's oracle rollup — throughput ≈ oracle operations, "

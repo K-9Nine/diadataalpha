@@ -120,6 +120,12 @@ Key design rules to preserve:
       NOTE on `confidence`: it now means "share of this protocol's TVL plausibly
       DIA-attributable", which is why oracle-agnostic giants stay LOW. See the
       header comment in `config/protocols.yaml`.
+- [x] History backfill (2026-06-13): `lasernet.fetch_lasernet_history` (31d tx
+      chart) + `coingecko.fetch_market_chart` (90d) populate `lasernet_history`
+      / `market_history`, giving real 7d/30d trends from run #1. Lasernet
+      throughput was +45% over 30d at build time — first hard usage-growth
+      signal. NEXT data upgrades: DefiLlama Pro (official oracle TVS, replaces
+      the proxy) or a Dune query for fees; both are paid.
 - [ ] Data is a point-in-time snapshot (researched 2026-06-12). Refresh the
       staking reading (APY recalibrates to ~5-6% on 2026-07-01) and add new
       grants/news as DIA ships them. `lasernet_tx_count` is left null — no
