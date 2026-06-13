@@ -75,6 +75,7 @@ dia_alpha_monitor/
   feed_activity.py# daily feed-coverage snapshot + RWA-vs-crypto split (v2)
   evm_oracle.py   # on-chain oracle update polling via public RPC (v2)
   lasernet.py     # Lasernet rollup throughput via Blockscout API — real usage (v2)
+  rss_ingest.py   # RSS auto-ingestion of news (DIA blog) -> ingested_news (v2)
   grants.py       # grant funnel: conversion rates + stale-grant flags (v2)
   alerts.py       # week-over-week >10% movement [ALERT]s (v2)
   defillama.py    # per-protocol AND per-chain (kind: chain) TVL + compute_proxy()
@@ -137,7 +138,9 @@ Key design rules to preserve:
       "20,000+ RWA assets" recorded as a labelled, sourced manual figure shown
       next to the live REST floor. DEEPER (not done): decode Lasernet oracle
       feed KEYS (e.g. "AAPL/USD") to classify RWA vs crypto precisely.
-- [ ] v2 ideas remaining: RSS auto-ingest for the news tracker.
+- [x] RSS auto-ingest for the news tracker: DONE as `rss_ingest.py` +
+      `config/news_feeds.yaml` (DIA blog). Items are keyword-classified,
+      deduped by URL, merged into the report (manual wins), tagged `[rss]`.
 - [ ] Feed DIA-API/feed-coverage signals into the 0–100 score (currently shown
       but not scored — would need a deliberate weight rebalance).
 
