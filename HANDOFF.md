@@ -1,156 +1,129 @@
 # Handoff — dia-alpha-monitor
 
 > Pick-up doc for a fresh Claude Code session (or a human). Read this first.
+> Last updated 2026-06-13.
 
 ## TL;DR
-- **What it is:** a local Python tool that collects DIA Data / DIA Oracles
-  signals (market, DIA-linked TVL proxy, grants, RWA news, staking, competitors)
+- **What it is:** a local Python tool answering one question — *is DIA Data
+  evolving from a governance token into usage-based oracle infrastructure, and
+  is it a buy?* It collects market, on-chain, adoption and competitor signals
   into SQLite and prints a transparent 0–100 "alpha score" + investor report.
-- **Status:** **built, tested (44 passing), committed, and pushed.** v1 + v2.
-  Live APIs validated; DIA's own API (`dia_api.py`) is a primary signed source.
-  v2 added: feed-coverage tracker, on-chain oracle polling, grant funnel,
-  ≥7-day trend gating, a week-over-week [ALERT] banner, and a **Lasernet
-  throughput** collector (real oracle-usage signal via explorer.diadata.org).
-- **Branch:** PR #1 (`claude/dia-alpha-monitor-build-8p1br6`) is **merged into
-  `main`**. Current work continues on `claude/friendly-hawking-2tu1jf`.
-- **Repo:** `K-9Nine/diadataalpha` (this is the target repo; `answergraph3` is unrelated).
+- **Status:** **fully built, merged to `main`, CI green, 56 passing tests.**
+  v1 + v2 + RSS ingest + history backfill + TVS recalibration + DefiLlama Pro
+  integration are all merged (PRs #1–#7).
+- **Repo:** `K-9Nine/diadataalpha`. Default branch `main` has everything.
+- **Latest investment read** (2026-06-13, see `ANALYSIS.md`): **speculative
+  accumulate** at ~$0.12. Fair-value range **~$0.30–0.62 (base, 2.5–5×)**, bull
+  ~$1.20, floor ~$0.10. Verdict hinges on the usage→fees link.
 
-## The one open blocker — RESOLVED ✅
-Live API data is now validated against the real endpoints. As of 2026-06-12 a
-fresh session had full egress: CoinGecko `/ping` → 200, DeFiLlama `/protocols`
-→ 200. `run` populates **8/8 TVL rows** and **4/5 competitors** (Chronicle has
-no liquid token by design). If a future session loses connectivity, the symptom
-is `403 Host not in allowlist`; that means the open-internet policy hasn't
-applied (it only takes effect in a newly-started session).
+## ⭐ THE #1 NEXT ACTION — finish the DefiLlama Pro hook-up
+The user **has a DefiLlama Pro API key** and the integration is built but **not
+yet validated against a live key**. To finish it:
 
-### Quick start in a new session
+1. Confirm `DEFILLAMA_API_KEY` is set in the environment (it's read from the env;
+   it should have been added via the environment's variable/secret settings, and
+   env vars only apply in a **newly-started session** — so this session must be
+   the new one). Check **without printing the value**:
+   `[ -n "$DEFILLAMA_API_KEY" ] && echo set || echo missing`
+2. Run `python -m dia_alpha_monitor run`. Look for the line
+   `Oracle TVS (Pro): ok N days, latest $...`.
+3. **Verify the parser.** The `/api/oracles` JSON shape was *unverified* at build
+   time, so `defillama_pro._extract_oracle_series` handles two shapes defensively
+   and caches the raw payload to the `raw_cache` table (`source='defillama_pro'`).
+   If TVS does **not** populate (`oracle 'DIA' not found...`), inspect the raw
+   response: `SELECT payload FROM raw_cache WHERE source='defillama_pro' ORDER BY id DESC LIMIT 1;`
+   and adjust the parser to the real shape — it's a one-line fix.
+4. Once live, the report §3 switches from the manual $148M figure to live TVS +
+   a **real 7d/30d TVS-growth trend**, which also drives the alpha score's
+   `tvl_growth` category. Also attempts DIA fees (`/api/summary/fees/dia`) —
+   likely 404 (oracles aren't usually in the fees dataset); that's expected.
+
+## Quick start
 ```bash
 cd diadataalpha
 uv venv && source .venv/bin/activate
-uv pip install -e '.[dev]'
-python -m dia_alpha_monitor run        # hits live APIs
+uv pip install -e '.[dev]'              # add ,dashboard for Streamlit
+python -m dia_alpha_monitor run         # live APIs; backfills 31d/90d history
 python -m dia_alpha_monitor report
-python -m pytest                       # expect 30 passed
+python -m pytest                        # expect 56 passed (no network needed)
 ```
+Connectivity needs the open-internet egress policy (applied at container start).
+If you see `403 Host not in allowlist`, the policy didn't apply to this session.
 
-## Live validation (done 2026-06-12)
-All best-guess identifiers were checked against the live APIs and corrected:
-
-1. **DIA CoinGecko id** = `dia-data` — **confirmed correct** (price ≈ $0.124,
-   mcap ≈ $14.9M). In `models.py` `DIA_COINGECKO_ID`.
-2. **Competitor `coingecko_id`s** (`config/competitors.yaml`) — all resolve,
-   including `redstone-oracles` (previously uncertain — **confirmed**).
-   Chronicle has `coingecko_id: null` and shows as a data gap by design.
-3. **DeFiLlama slugs** (`config/protocols.yaml`) — corrected:
-   - `parallel` → `parallel-protocol-v3` (the live CDP stablecoin protocol).
-   - `zest-protocol` → `zest-v2` (`zest-protocol`/v1 is dead, reports TVL 0).
-   - `plume` / `somnia` were never protocols — they are **chains**. Added a
-     `kind: chain` field; chain entries fetch `/v2/historicalChainTvl/{name}`
-     (slug = chain name, e.g. `Plume Mainnet`, `Somnia`). See `defillama.py`
-     `_fetch_chain_tvl`.
-   - `morpho`, `euler`, `silo-finance`, `hydration` confirmed correct.
-
-Also fixed a reporting bug: re-running on the same day appended duplicate rows
-to the TVL/competitor tables because the report selected *all* rows for the
-date. `reporting.py` now keeps the newest row per slug (`MAX(id) GROUP BY slug`).
-
-## What works today (verified locally, no network)
-- `run` / `report` / `export` all work and **never crash on a failed source**
-  (failures are recorded in the report + `raw_cache` table).
-- Valuation maths, scoring model (incl. ≥7d trend gate), config loading, TVL
-  routing + dedup, the DIA-API / feed-coverage / Lasernet collectors, the EVM
-  oracle poller, the grant funnel, the WoW alerts, and CSV export are covered by
-  **44 passing pytest tests** (no network needed).
-- Full report rendering confirmed with seeded data (all 10 sections, absolute +
-  relative valuation scenarios, score breakdown).
+## The investment answer (current data, 2026-06-13)
+- Price $0.1223, mcap **$14.65M**, FDV $20.66M (circ 119.68M / total 168.82M).
+- **Official DIA oracle TVS (DefiLlama): ~$148.23M** → mcap/TVS **0.10×**.
+  Concentrated in Zest (~48%). This is the REAL secured value.
+- **Lasernet throughput +45% over 30d** — the strongest usage-growth signal.
+- Coverage: 5,859 crypto feeds, 102 chains, 83 active scrapers; 20,000+ RWA
+  (DIA-reported). Staking 4.4M DIA, 11 feeders, 12.56% APY (→5–6% Jul 1).
+- DIA vs peers: 0.26% of Chainlink, ~5% of Pyth, ~37% of RedStone, ~40% of API3.
+- Verdict: asymmetric speculative buy — cheap vs peers + growing usage, but
+  small absolute scale ($148M TVS) and **monetisation (fees) still unproven**.
 
 ## Architecture map (where to change things)
 ```
 dia_alpha_monitor/
   cli.py          # argparse: run / report / export; orchestrates collection
-  http_client.py  # the ONLY network path: timeout + retry + graceful failure + cache
-  coingecko.py    # DIA market + competitors (free /coins/markets)
-  dia_api.py      # DIA's OWN API (api.diadata.org): signed self-price + coverage
-                  #   (quoted assets / exchange sources) + price-divergence check
-  feed_activity.py# daily feed-coverage snapshot + RWA-vs-crypto split (v2)
-  evm_oracle.py   # on-chain oracle update polling via public RPC (v2)
-  lasernet.py     # Lasernet rollup throughput via Blockscout API — real usage (v2)
-  rss_ingest.py   # RSS auto-ingestion of news (DIA blog) -> ingested_news (v2)
-  grants.py       # grant funnel: conversion rates + stale-grant flags (v2)
-  alerts.py       # week-over-week >10% movement [ALERT]s (v2)
-  defillama.py    # per-protocol AND per-chain (kind: chain) TVL + compute_proxy()
-  config_loader.py# loads config/*.yaml + derives grants/news/staking metrics
-  scoring.py      # transparent 0–100 score; CATEGORY_MAX weights; NEUTRAL_FRACTION
-  valuation.py    # pure functions: market-cap + relative scenarios (unit-tested)
-  reporting.py    # single source of truth for derived numbers + rich rendering
-  db.py           # SQLite schema + append-only snapshots + raw_cache
-  models.py       # dataclasses + constants (DIA id, holding=500k, avg cost 0.18, scenarios)
-config/*.yaml     # all manual inputs (ship with labelled EXAMPLE placeholders)
+  http_client.py  # ONLY network path: get_json / get_text / post_json — timeout,
+                  #   retry, graceful (None,err), optional raw_cache
+  coingecko.py    # DIA market + competitors + fetch_market_chart (90d history)
+  dia_api.py      # DIA's OWN API: signed self-price + coverage + divergence
+  feed_activity.py# daily feed-coverage snapshot + RWA-vs-crypto split
+  defillama.py    # per-protocol AND per-chain (kind: chain) TVL "reach" proxy
+  defillama_pro.py# Pro API: OFFICIAL oracle TVS series + DIA fees (needs key)
+  lasernet.py     # Lasernet rollup throughput + 31d history (real usage)
+  evm_oracle.py   # on-chain oracle update polling via public RPC
+  rss_ingest.py   # RSS auto-ingest of DIA blog -> ingested_news (dedup by URL)
+  grants.py       # grant funnel: conversion rates + stale-grant flags
+  alerts.py       # week-over-week >10% [ALERT]s (gated on >=7d history)
+  config_loader.py# loads config/*.yaml + grants/news/staking metrics
+  scoring.py      # 0–100 score; CATEGORY_MAX weights; >=7d trend gate
+  valuation.py    # market-cap + relative scenarios (pure, unit-tested)
+  reporting.py    # SINGLE source of truth for derived numbers + rich rendering;
+                  #   *_block() builders; merged_news(); oracle_tvs_block()
+  db.py           # SQLite schema; insert/upsert/latest/latest_value/
+                  #   nearest_before/history_span_days; all_rows ORDER BY rowid
+  models.py       # dataclasses + constants (DIA ids, holding=500k @ 0.18)
+config/*.yaml     # manual inputs — all VERIFIED & source-linked (not examples)
 dashboard.py      # optional: streamlit run dashboard.py
-tests/            # test_valuation.py, test_scoring.py, test_pipeline.py
+ANALYSIS.md       # the scrutinizable investment summary
+tests/            # 56 tests, fully offline
 ```
 
-Key design rules to preserve:
-- **TVL is a "DIA-linked proxy", never call it official DIA TVS.** It's the TVL
-  of watchlisted protocols. Labelled as a proxy everywhere it appears.
-- **Missing data is scored at a neutral 40% baseline + flagged as a data gap**,
-  not zero, so the headline number isn't dominated by empty manual files.
-- Personal position (500,000 DIA @ ~$0.18, staked) lives in `models.py`.
-- Everything is **research signals, not financial advice.**
-- **Trusted-sources policy (added 2026-06-12):** every config `evidence_url`
-  and `source` must be a *fully trusted* source — DIA's own properties
-  (`diadata.org`, `docs.diadata.org`, `forum.diadata.org`, `api.diadata.org`,
-  DIA GitHub) or the canonical free data APIs already used (CoinGecko,
-  DeFiLlama). No third-party news/aggregators (CoinMarketCap, crypto news
-  blogs, Medium). `dia_api.py` is the embodiment of this — DIA's own signed
-  data. Report section "1b" cross-checks DIA's self-price vs CoinGecko as a
-  data-integrity signal (currently ~0.2% divergence — sources agree).
+## Config files (all verified/source-linked; trusted-sources policy applies)
+`protocols.yaml` (TVL-proxy watchlist + dia_role/confidence), `competitors.yaml`,
+`grants.yaml`, `news.yaml`, `staking_snapshots.yaml`, `oracles.yaml` (EVM RPC +
+oracle addresses), `feeds.yaml` (manual RWA count), `news_feeds.yaml` (RSS),
+`oracle_tvs.yaml` (manual official-TVS fallback used when no Pro key).
 
-## Suggested next steps
-- [x] Run live, fix wrong CoinGecko ids / DeFiLlama slugs (done 2026-06-12).
-- [x] Replace the `EXAMPLE` placeholder rows in `config/grants.yaml`,
-      `news.yaml`, `staking_snapshots.yaml` with verified, source-linked entries
-      (done 2026-06-12 via web research — every row links a primary source).
-- [x] Set real `dia_role` / `confidence` / `evidence_url` per watchlist protocol.
-      All 8 verified against DIA's own integration announcements: Parallel &
-      Hydration = primary_oracle/high; Morpho/Euler/Silo/Zest = secondary_oracle
-      (Morpho/Euler/Silo kept confidence=low on purpose — DIA only secures
-      *select* markets, so their multi-$B TVL is NOT DIA-attributable);
-      Plume/Somnia = grant_recipient/low.
-      NOTE on `confidence`: it now means "share of this protocol's TVL plausibly
-      DIA-attributable", which is why oracle-agnostic giants stay LOW. See the
-      header comment in `config/protocols.yaml`.
-- [x] History backfill (2026-06-13): `lasernet.fetch_lasernet_history` (31d tx
-      chart) + `coingecko.fetch_market_chart` (90d) populate `lasernet_history`
-      / `market_history`, giving real 7d/30d trends from run #1. Lasernet
-      throughput was +45% over 30d at build time — first hard usage-growth
-      signal. NEXT data upgrades: DefiLlama Pro (official oracle TVS, replaces
-      the proxy) or a Dune query for fees; both are paid.
-- [ ] Data is a point-in-time snapshot (researched 2026-06-12). Refresh the
-      staking reading (APY recalibrates to ~5-6% on 2026-07-01) and add new
-      grants/news as DIA ships them. `lasernet_tx_count` is left null — no
-      public free endpoint found; wire one up if/when available.
-- [ ] (Optional) Add a `doctor` subcommand: ping both APIs + resolve every
-      configured id/slug and print a "resolved vs failed" table — makes the
-      first live run self-diagnosing.
-- [x] CI workflow running `pytest` (`.github/workflows/ci.yml`, uv, py3.11+3.12,
-      offline tests) — added 2026-06-12.
-- [x] On-chain usage signal: SOLVED via `lasernet.py` — Lasernet (DIA's oracle
-      rollup) throughput from explorer.diadata.org Blockscout API (~313k tx/day).
-      This is where oracle activity actually happens (the consumer-chain
-      `evm_oracle.py` poller stays as a complementary signal; its seeded legacy
-      addresses are quiet — add active production adapters if wanted).
-- [x] RWA undercount: mitigated via `config/feeds.yaml` — DIA's published
-      "20,000+ RWA assets" recorded as a labelled, sourced manual figure shown
-      next to the live REST floor. DEEPER (not done): decode Lasernet oracle
-      feed KEYS (e.g. "AAPL/USD") to classify RWA vs crypto precisely.
-- [x] RSS auto-ingest for the news tracker: DONE as `rss_ingest.py` +
-      `config/news_feeds.yaml` (DIA blog). Items are keyword-classified,
-      deduped by URL, merged into the report (manual wins), tagged `[rss]`.
-- [ ] Feed DIA-API/feed-coverage signals into the 0–100 score (currently shown
-      but not scored — would need a deliberate weight rebalance).
+## Key design rules to preserve
+- **The TVL "proxy" is watchlist REACH, NOT secured value.** It sums whole-
+  protocol TVL of DIA users (~$11B) and overstates the real ~$148M oracle TVS by
+  ~76×. The report §3 leads with official TVS and labels the proxy accordingly —
+  never present the proxy as TVS.
+- **Trusted-sources policy:** every config `evidence_url`/`source` is a DIA-
+  official property or a canonical data API (CoinGecko / DeFiLlama). No third-
+  party news/aggregators.
+- **Graceful failure everywhere** — a dead source/slug/RPC/key is recorded, never
+  crashes a run. Missing data is neutral-scored + flagged, not zeroed.
+- **Trend metrics need ≥7d history** → show INSUFFICIENT DATA, not a misleading 0%.
+- Personal position (500,000 DIA @ ~$0.18) lives in `models.py` (PnL only).
+- Everything is **research signals, not financial advice.**
 
 ## Conventions
-- PR #1 is merged into `main`. Develop on `claude/friendly-hawking-2tu1jf`.
-- `git push -u origin claude/friendly-hawking-2tu1jf` (retry w/ backoff on
-  network errors). Do not push to other branches. Do not open a new PR.
+- Develop on a fresh `claude/<topic>` branch off `main`; open a PR; the user
+  merges (CI must be green — workflow runs `pytest` on py3.11+3.12 via `uv`).
+- Do **not** open a PR unless asked. Do **not** commit secrets (`.env` is
+  gitignored). Keep the model identifier out of commits/PRs.
+- CI gotcha (already fixed): use `uv venv` + `uv run pytest`, never
+  `uv pip install --system` (PEP-668 fails on GitHub runners).
+
+## Open / next steps
+- [ ] **Validate the DefiLlama Pro `/api/oracles` parse on a live key** (see #1).
+- [ ] Once live TVS history accrues, the `tvl_growth` score uses REAL TVS growth.
+- [ ] Optional: a `doctor` subcommand (ping APIs + resolve every id/slug).
+- [ ] Maintenance: refresh `staking_snapshots.yaml` after the 2026-07-01 APY
+      recalibration; keep `oracle_tvs.yaml` current if running without the key.
+- [ ] Deeper RWA: decode Lasernet oracle feed keys (e.g. `AAPL/USD`) to classify
+      RWA vs crypto precisely (current live RWA count is a floor).
