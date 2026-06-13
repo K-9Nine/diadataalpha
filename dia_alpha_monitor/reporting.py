@@ -476,7 +476,7 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
     )
     console.print(t)
 
-    # 3. DIA-linked TVL proxy
+    # 3. DIA oracle TVS (official) vs watchlist reach (the proxy)
     if tvl.get("insufficient_history"):
         change_line = (
             f"Weekly / 30d change: [yellow]INSUFFICIENT DATA[/yellow] "
@@ -488,13 +488,30 @@ def print_report(console: Console, db: Database, warnings: list[str] | None = No
             f"Weekly change: {_pct(tvl['weekly_change'])}   "
             f"30d change: {_pct(tvl['monthly_change'])}"
         )
+    # Official TVS (manual, DefiLlama) anchors the proxy so it can't mislead.
+    tvs_meta, _ = config_loader.load_oracle_tvs()
+    tvs = tvs_meta.get("defillama_tvs_usd")
+    official_line = ""
+    if tvs:
+        mcap = market.get("market_cap")
+        mcap_tvs = f"{mcap / tvs:.2f}x" if mcap else "n/a"
+        gross = tvl.get("gross_tvl") or 0
+        overstate = f"~{gross / tvs:.0f}x" if tvs else "n/a"
+        official_line = (
+            f"[bold]OFFICIAL DIA oracle TVS (DefiLlama, {tvs_meta.get('as_of','?')}): "
+            f"{_money(tvs)}[/bold]   mcap/TVS: {mcap_tvs}\n"
+            f"  Top: {tvs_meta.get('top_protocols','?')}   [dim]{tvs_meta.get('source','')}[/dim]\n"
+            f"[yellow]⚠ The 'reach' figures below sum WHOLE-protocol TVL of DIA users — an "
+            f"UPPER BOUND, not secured value. They overstate real TVS {overstate}.[/yellow]\n─\n"
+        )
     console.print(
         Panel(
-            f"Gross DIA-linked TVL proxy: [bold]{_money(tvl['gross_tvl'])}[/bold]   "
-            f"Confidence-weighted: [bold]{_money(tvl['confidence_weighted_tvl'])}[/bold]\n"
+            official_line
+            + f"Watchlist reach (gross): [bold]{_money(tvl['gross_tvl'])}[/bold]   "
+            f"confidence-weighted: [bold]{_money(tvl['confidence_weighted_tvl'])}[/bold]\n"
             f"{change_line}   "
             f"Resolved {tvl['n_resolved']}/{tvl['n_protocols']} protocols",
-            title="3. DIA-linked TVL Proxy  ⚠ PROXY — NOT official DIA TVS",
+            title="3. DIA Oracle TVS (official) vs Watchlist Reach  ⚠ reach ≠ secured value",
             border_style="yellow",
         )
     )

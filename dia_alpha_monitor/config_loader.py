@@ -82,6 +82,12 @@ def load_news_feeds() -> tuple[list[dict], str]:
     return list(items or []), warn
 
 
+def load_oracle_tvs() -> tuple[dict, str]:
+    """Official DIA oracle TVS (DefiLlama), recorded manually (API is paywalled)."""
+    data, warn = _load_yaml("oracle_tvs.yaml")
+    return (data if isinstance(data, dict) else {}), warn
+
+
 # -- derived metrics -------------------------------------------------------
 
 def _parse_date(value: Any) -> datetime | None:

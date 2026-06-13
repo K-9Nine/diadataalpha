@@ -414,6 +414,12 @@ def test_lasernet_block_trend_from_history(tmp_path):
     db.close()
 
 
+def test_oracle_tvs_loads():
+    meta, warn = config_loader.load_oracle_tvs()
+    assert isinstance(meta, dict)
+    assert meta.get("defillama_tvs_usd")  # shipped official-TVS figure present
+
+
 def test_config_loaders_return_lists():
     # Uses the repo's config/ dir; should parse without raising.
     protocols, _ = config_loader.load_protocols()
