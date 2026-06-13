@@ -21,9 +21,11 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install project (with dev extras)
-        run: uv pip install --system -e '.[dev]'
+      - name: Create venv + install (dev extras)
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install -e '.[dev]'
 
       # The test suite is fully offline — no network access required.
       - name: Run tests
-        run: python -m pytest
+        run: uv run pytest
