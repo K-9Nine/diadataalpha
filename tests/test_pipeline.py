@@ -428,6 +428,19 @@ def test_defillama_pro_parses_oracle_series_dict_shape(monkeypatch):
     assert rows[-1]["tvs_usd"] == 1.4823e8        # newest last
 
 
+def test_defillama_pro_parses_oracle_series_breakdown_shape(monkeypatch):
+    # Shape A' (real live payload): per-oracle value is a {tvl,...} breakdown dict.
+    monkeypatch.setenv("DEFILLAMA_API_KEY", "testkey")
+    payload = {"chart": {
+        "1700000000": {"Chainlink": {"tvl": 9e9}, "DIA": {"tvl": 1.40e8, "staking": 3e6}},
+        "1700086400": {"Chainlink": {"tvl": 9e9}, "DIA": {"tvl": 1.4823e8, "staking": 3e6}},
+    }}
+    monkeypatch.setattr(defillama_pro, "get_json", lambda *a, **k: (payload, ""))
+    rows, err = defillama_pro.fetch_oracle_tvs_series("DIA")
+    assert err == "" and len(rows) == 2
+    assert rows[-1]["tvs_usd"] == 1.4823e8        # uses the `tvl` field, newest last
+
+
 def test_defillama_pro_parses_oracle_series_list_shape(monkeypatch):
     # Shape B: chart as list of [ts, {oracle: tvs}]
     monkeypatch.setenv("DEFILLAMA_API_KEY", "testkey")
