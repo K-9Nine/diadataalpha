@@ -4,8 +4,9 @@
 # the WHOLE TVL of protocols that use DIA somewhere — it is an upper bound on
 # *reach*, not the value DIA actually secures, and it overstates real TVS by
 # ~16-76x. DefiLlama computes the real per-oracle TVS (only the markets/pools a
-# given oracle actually secures). The /oracles API is paywalled (DefiLlama Pro),
-# so we record the public figure here manually.
+# given oracle actually secures). The tool now pulls this live from DefiLlama's
+# free /oracles endpoint (or Pro /api/oracles if DEFILLAMA_API_KEY is set); this
+# manual figure is the fallback used only when neither is reachable.
 #
 # VERIFY FREE (no account) at: https://defillama.com/oracles/DIA
 # Refresh periodically; DefiLlama Pro would automate this + add history.

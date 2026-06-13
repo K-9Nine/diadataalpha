@@ -175,7 +175,22 @@ def cmd_run(args) -> int:
         else:
             console.print("[dim]DIA fees (Pro): not in DefiLlama fees dataset (expected for oracles)[/dim]")
     else:
-        console.print("[dim]DefiLlama Pro: no DEFILLAMA_API_KEY — using manual TVS figure[/dim]")
+        # No Pro key: try the FREE /oracles endpoint for official DIA TVS.
+        # On any failure we fall through to the manual figure in oracle_tvs.yaml
+        # (oracle_tvs_block prefers live history over the manual value).
+        tvs_rows, tvs_err = defillama.fetch_oracle_tvs_series("DIA", cache=db)
+        for r in tvs_rows:
+            db.upsert("oracle_tvs_history", r)
+        if tvs_err:
+            console.print(
+                f"[dim]Oracle TVS (free /oracles): {tvs_err} — using manual TVS figure[/dim]"
+            )
+        else:
+            latest_tvs = db.latest_value("oracle_tvs_history", "tvs_usd")
+            console.print(
+                f"[green]Oracle TVS (free /oracles): ok[/green] {len(tvs_rows)} days, "
+                f"latest ${latest_tvs:,.0f}"
+            )
 
     # F. Competitors ------------------------------------------------------
     competitors, cwarn = config_loader.load_competitors()

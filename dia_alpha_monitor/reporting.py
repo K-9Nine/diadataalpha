@@ -164,8 +164,9 @@ def feed_activity_block(db: Database) -> dict[str, Any]:
 
 
 def oracle_tvs_block(db: Database) -> dict[str, Any]:
-    """Official DIA oracle TVS — live from DefiLlama Pro if available, else the
-    manual figure in config/oracle_tvs.yaml. Live data also yields 7d/30d growth.
+    """Official DIA oracle TVS — live from DefiLlama's /oracles endpoint (free,
+    or Pro /api/oracles if a key is set), else the manual figure in
+    config/oracle_tvs.yaml. Live data also yields 7d/30d growth.
     """
     live = db.latest_value("oracle_tvs_history", "tvs_usd")
     if live is not None:
@@ -176,7 +177,7 @@ def oracle_tvs_block(db: Database) -> dict[str, Any]:
             monthly = _pct_change(live, db.nearest_before("oracle_tvs_history", 30, "tvs_usd"))
         return {
             "present": True, "live": True, "tvs": live, "wow": wow, "monthly": monthly,
-            "history_days": days, "source": "DefiLlama Pro (live)",
+            "history_days": days, "source": "DefiLlama /oracles (live)",
         }
     meta, _ = config_loader.load_oracle_tvs()
     if meta.get("defillama_tvs_usd"):

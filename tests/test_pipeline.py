@@ -437,6 +437,32 @@ def test_defillama_pro_parses_oracle_series_list_shape(monkeypatch):
     assert err == "" and [r["tvs_usd"] for r in rows] == [100.0, 150.0]
 
 
+def test_defillama_free_oracle_series_dict_shape(monkeypatch):
+    # Free /oracles endpoint, chart keyed by timestamp -> {oracle: tvs}.
+    payload = {"chart": {
+        "1700000000": {"Chainlink": 9e9, "DIA": 1.40e8},
+        "1700086400": {"Chainlink": 9e9, "DIA": 1.4823e8},
+    }}
+    monkeypatch.setattr(defillama, "get_json", lambda *a, **k: (payload, ""))
+    rows, err = defillama.fetch_oracle_tvs_series("DIA")
+    assert err == "" and len(rows) == 2
+    assert rows[-1]["tvs_usd"] == 1.4823e8        # newest last
+
+
+def test_defillama_free_oracle_series_missing_oracle(monkeypatch):
+    payload = {"chart": {"1700000000": {"Chainlink": 9e9}}}
+    monkeypatch.setattr(defillama, "get_json", lambda *a, **k: (payload, ""))
+    rows, err = defillama.fetch_oracle_tvs_series("DIA")
+    assert rows == [] and "not found" in err
+
+
+def test_defillama_free_oracle_series_handles_error(monkeypatch):
+    # An unexpected paywall/failure must surface as an error (caller falls back).
+    monkeypatch.setattr(defillama, "get_json", lambda *a, **k: (None, "403"))
+    rows, err = defillama.fetch_oracle_tvs_series("DIA")
+    assert rows == [] and err == "403"
+
+
 def test_defillama_pro_no_key_is_graceful(monkeypatch):
     monkeypatch.delenv("DEFILLAMA_API_KEY", raising=False)
     assert defillama_pro.have_key() is False

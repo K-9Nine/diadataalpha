@@ -13,6 +13,7 @@ DIA TVS and must always be labelled as a proxy.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from dia_alpha_monitor.http_client import get_json
@@ -109,6 +110,78 @@ def fetch_protocol_tvl(protocol: dict, cache=None) -> TvlSnapshot:
 
 def fetch_all_protocols(protocols: list[dict], cache=None) -> list[TvlSnapshot]:
     return [fetch_protocol_tvl(p, cache=cache) for p in protocols]
+
+
+# --------------------------------------------------------------------------
+# Official per-oracle TVS via the FREE /oracles endpoint.
+#
+# DefiLlama's public oracles page (defillama.com/oracles) is rendered from
+# ``https://api.llama.fi/oracles``, which is part of the free open API. This
+# gives us the *official* DIA Total Value Secured (the value DIA's oracles
+# actually secure) WITHOUT a paid Pro key, replacing the manually-maintained
+# figure in ``config/oracle_tvs.yaml``.
+#
+# The chart shape isn't formally documented and has varied, so the parser is
+# defensive (handles dict-keyed-by-timestamp and list-of-pairs). If the
+# endpoint ever requires Pro after all, ``get_json`` returns an error and the
+# caller falls back to the manual figure — so this never regresses behaviour.
+# (``defillama_pro.py`` reuses these helpers for the Pro ``/api/oracles`` path.)
+# --------------------------------------------------------------------------
+
+
+def _to_date(ts: Any) -> str:
+    try:
+        t = int(float(ts))
+        if t > 1_000_000_000_000:  # milliseconds -> seconds
+            t //= 1000
+        return datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y-%m-%d")
+    except (TypeError, ValueError, OSError):
+        return str(ts)[:10]
+
+
+def _extract_oracle_series(data: dict, oracle: str) -> dict[str, float]:
+    """Pull a {date: tvs} series for one oracle from an oracles payload.
+
+    Tolerant of the two shapes seen in the wild:
+      A) {"chart": {"<ts>": {"DIA": tvs, ...}, ...}}
+      B) {"chart": [[<ts>, {"DIA": tvs, ...}], ...]}
+    """
+    chart = data.get("chart")
+    series: dict[str, float] = {}
+    if isinstance(chart, dict):
+        for ts, mapping in chart.items():
+            if isinstance(mapping, dict):
+                v = mapping.get(oracle)
+                if isinstance(v, (int, float)):
+                    series[_to_date(ts)] = float(v)
+    elif isinstance(chart, list):
+        for point in chart:
+            if isinstance(point, (list, tuple)) and len(point) == 2 and isinstance(point[1], dict):
+                v = point[1].get(oracle)
+                if isinstance(v, (int, float)):
+                    series[_to_date(point[0])] = float(v)
+    return series
+
+
+def fetch_oracle_tvs_series(oracle: str = "DIA", cache=None) -> tuple[list[dict], str]:
+    """Official oracle TVS series via the free ``/oracles`` endpoint.
+
+    Returns ``([{date, tvs_usd}], error)`` for one oracle, newest last. No API
+    key required. On any failure (incl. an unexpected paywall) the error is
+    returned and the caller falls back to the manual figure.
+    """
+    data, err = get_json(
+        f"{BASE}/oracles",
+        cache=cache,
+        cache_source="defillama",
+        cache_key="oracles",
+    )
+    if err or not isinstance(data, dict):
+        return [], err or "no data"
+    series = _extract_oracle_series(data, oracle)
+    if not series:
+        return [], f"oracle '{oracle}' not found in /oracles chart"
+    return [{"date": d, "tvs_usd": series[d]} for d in sorted(series)], ""
 
 
 def compute_proxy(snapshots: list[TvlSnapshot]) -> dict[str, Any]:
