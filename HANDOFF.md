@@ -6,31 +6,46 @@
 - **What it is:** a local Python tool that collects DIA Data / DIA Oracles
   signals (market, DIA-linked TVL proxy, grants, RWA news, staking, competitors)
   into SQLite and prints a transparent 0–100 "alpha score" + investor report.
-- **Status:** **built, tested (44 passing), committed, and pushed.** v1 + v2.
+- **Status:** **built, tested (59 passing), committed, and pushed.** v1 + v2 + v3.
   Live APIs validated; DIA's own API (`dia_api.py`) is a primary signed source.
   v2 added: feed-coverage tracker, on-chain oracle polling, grant funnel,
   ≥7-day trend gating, a week-over-week [ALERT] banner, and a **Lasernet
   throughput** collector (real oracle-usage signal via explorer.diadata.org).
-- **Branch:** PR #1 (`claude/dia-alpha-monitor-build-8p1br6`) is **merged into
-  `main`**. Current work continues on `claude/friendly-hawking-2tu1jf`.
+  v3 added: **official DIA oracle TVS** from DefiLlama — Pro `/api/oracles`
+  (key-gated, `defillama_pro.py`) AND a **free `/oracles` fallback**
+  (`defillama.fetch_oracle_tvs_series`, no key needed); both feed
+  `oracle_tvs_history` and the report prefers live over the manual figure.
+  Also added a **SessionStart hook** (`.claude/`) that `uv pip install`s deps
+  for web sessions.
+- **Branch:** PRs #1–#7 are **merged into `main`**. Latest work is on
+  `claude/untitled-session-kw77io` (free TVS fallback + hook). Continue there.
 - **Repo:** `K-9Nine/diadataalpha` (this is the target repo; `answergraph3` is unrelated).
 
-## The one open blocker — RESOLVED ✅
-Live API data is now validated against the real endpoints. As of 2026-06-12 a
-fresh session had full egress: CoinGecko `/ping` → 200, DeFiLlama `/protocols`
-→ 200. `run` populates **8/8 TVL rows** and **4/5 competitors** (Chronicle has
-no liquid token by design). If a future session loses connectivity, the symptom
-is `403 Host not in allowlist`; that means the open-internet policy hasn't
-applied (it only takes effect in a newly-started session).
+## Network egress (read before a live run)
+The tests are **fully offline** (59 passing, no network). A *live* `run`,
+however, needs egress to CoinGecko, DeFiLlama (`api.llama.fi` +
+`pro-api.llama.fi`), DIA's API, and the explorers. Egress is set by the
+**environment's network policy** (chosen at environment creation) — it is NOT
+something a session or a hook can change. The symptom of a blocked host is
+`403 Host not in allowlist: <host>`. To fix: pick the **open-internet** policy
+or add the hosts above to the egress allowlist. The open-internet policy only
+takes effect in a **newly-started** session. (As of 2026-06-13 the active
+session had egress blocked, so the v3 free `/oracles` path was validated
+offline with mocked payloads, not live.)
+
+`DEFILLAMA_API_KEY` (Pro) lives in the session env area; when set, `run` uses
+the Pro `/api/oracles` path, otherwise the free `/oracles` fallback.
 
 ### Quick start in a new session
+A SessionStart hook (`.claude/hooks/session-start.sh`) auto-installs deps in web
+sessions. To do it manually / locally:
 ```bash
 cd diadataalpha
 uv venv && source .venv/bin/activate
 uv pip install -e '.[dev]'
-python -m dia_alpha_monitor run        # hits live APIs
+python -m dia_alpha_monitor run        # hits live APIs (needs egress)
 python -m dia_alpha_monitor report
-python -m pytest                       # expect 30 passed
+python -m pytest                       # expect 59 passed (offline)
 ```
 
 ## Live validation (done 2026-06-12)
@@ -59,8 +74,9 @@ date. `reporting.py` now keeps the newest row per slug (`MAX(id) GROUP BY slug`)
   (failures are recorded in the report + `raw_cache` table).
 - Valuation maths, scoring model (incl. ≥7d trend gate), config loading, TVL
   routing + dedup, the DIA-API / feed-coverage / Lasernet collectors, the EVM
-  oracle poller, the grant funnel, the WoW alerts, and CSV export are covered by
-  **44 passing pytest tests** (no network needed).
+  oracle poller, the grant funnel, the WoW alerts, the official-TVS collectors
+  (free `/oracles` + Pro), and CSV export are covered by **59 passing pytest
+  tests** (no network needed).
 - Full report rendering confirmed with seeded data (all 10 sections, absolute +
   relative valuation scenarios, score breakdown).
 
@@ -78,7 +94,12 @@ dia_alpha_monitor/
   rss_ingest.py   # RSS auto-ingestion of news (DIA blog) -> ingested_news (v2)
   grants.py       # grant funnel: conversion rates + stale-grant flags (v2)
   alerts.py       # week-over-week >10% movement [ALERT]s (v2)
-  defillama.py    # per-protocol AND per-chain (kind: chain) TVL + compute_proxy()
+  defillama.py    # free api.llama.fi: per-protocol AND per-chain (kind: chain)
+                  #   TVL + compute_proxy(); ALSO free /oracles official TVS
+                  #   (fetch_oracle_tvs_series) + the shared oracle-chart parser
+  defillama_pro.py# Pro pro-api.llama.fi (DEFILLAMA_API_KEY): official oracle TVS
+                  #   history via /api/oracles + DIA fees; reuses defillama.py's
+                  #   parser. No-ops gracefully without a key.
   config_loader.py# loads config/*.yaml + derives grants/news/staking metrics
   scoring.py      # transparent 0–100 score; CATEGORY_MAX weights; NEUTRAL_FRACTION
   valuation.py    # pure functions: market-cap + relative scenarios (unit-tested)
@@ -88,6 +109,8 @@ dia_alpha_monitor/
 config/*.yaml     # all manual inputs (ship with labelled EXAMPLE placeholders)
 dashboard.py      # optional: streamlit run dashboard.py
 tests/            # test_valuation.py, test_scoring.py, test_pipeline.py
+.claude/          # SessionStart hook (hooks/session-start.sh) + settings.json
+                  #   — auto-installs deps in web sessions (synchronous)
 ```
 
 Key design rules to preserve:
@@ -107,6 +130,14 @@ Key design rules to preserve:
   data-integrity signal (currently ~0.2% divergence — sources agree).
 
 ## Suggested next steps
+- [x] Official DIA oracle TVS via DefiLlama — DONE. Pro `/api/oracles`
+      (`defillama_pro.py`, PR #7) replaces the proxy as the real TVS signal, and
+      a **free `/oracles` fallback** (`defillama.fetch_oracle_tvs_series`, this
+      session) makes live TVS work with NO key. Both write `oracle_tvs_history`;
+      `config/oracle_tvs.yaml` is now only the last-resort manual fallback.
+      NOT yet validated against the live endpoint (egress was blocked) — first
+      egress-enabled run should confirm the free `/oracles` shape parses (the
+      parser is defensive + cached to `raw_cache` if it needs correcting).
 - [x] Run live, fix wrong CoinGecko ids / DeFiLlama slugs (done 2026-06-12).
 - [x] Replace the `EXAMPLE` placeholder rows in `config/grants.yaml`,
       `news.yaml`, `staking_snapshots.yaml` with verified, source-linked entries
@@ -124,8 +155,7 @@ Key design rules to preserve:
       chart) + `coingecko.fetch_market_chart` (90d) populate `lasernet_history`
       / `market_history`, giving real 7d/30d trends from run #1. Lasernet
       throughput was +45% over 30d at build time — first hard usage-growth
-      signal. NEXT data upgrades: DefiLlama Pro (official oracle TVS, replaces
-      the proxy) or a Dune query for fees; both are paid.
+      signal.
 - [ ] Data is a point-in-time snapshot (researched 2026-06-12). Refresh the
       staking reading (APY recalibrates to ~5-6% on 2026-07-01) and add new
       grants/news as DIA ships them. `lasernet_tx_count` is left null — no
@@ -151,6 +181,7 @@ Key design rules to preserve:
       but not scored — would need a deliberate weight rebalance).
 
 ## Conventions
-- PR #1 is merged into `main`. Develop on `claude/friendly-hawking-2tu1jf`.
-- `git push -u origin claude/friendly-hawking-2tu1jf` (retry w/ backoff on
-  network errors). Do not push to other branches. Do not open a new PR.
+- PRs #1–#7 are merged into `main`. Latest work is on
+  `claude/untitled-session-kw77io`.
+- `git push -u origin claude/untitled-session-kw77io` (retry w/ backoff on
+  network errors). Do not push to other branches. Do not open a PR unless asked.
