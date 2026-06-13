@@ -25,6 +25,7 @@ from dia_alpha_monitor import (
     feed_activity,
     lasernet,
     reporting,
+    rss_ingest,
 )
 from dia_alpha_monitor.db import Database
 from dia_alpha_monitor.models import DIA_COINGECKO_ID, today_str, utcnow
@@ -164,6 +165,19 @@ def cmd_run(args) -> int:
             },
         )
 
+    # F2. RSS auto-ingestion into the news tracker -----------------------
+    news_feeds, nfwarn = config_loader.load_news_feeds()
+    if nfwarn:
+        warnings.append(nfwarn)
+    if news_feeds:
+        res = rss_ingest.ingest(news_feeds, db)
+        console.print(
+            f"[green]RSS ingest: ok[/green] {res['new']} new / {res['seen']} seen "
+            f"from {len(news_feeds)} feed(s)"
+        )
+        for e in res["errors"]:
+            warnings.append(f"RSS feed: {e}")
+
     # G. Score + persist --------------------------------------------------
     agg = reporting.compute_alpha(db)
     reporting.persist_score(db, agg)
@@ -211,6 +225,7 @@ def cmd_export(args) -> int:
         "tvl_proxy",
         "competitor_snapshots",
         "staking_snapshots",
+        "ingested_news",
         "score_snapshots",
     ]
     written = []

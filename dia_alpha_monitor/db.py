@@ -121,6 +121,14 @@ CREATE TABLE IF NOT EXISTS lasernet_snapshots (
     total_blocks INTEGER, total_addresses INTEGER,
     source TEXT, error TEXT
 );
+
+CREATE TABLE IF NOT EXISTS ingested_news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_seen TEXT NOT NULL,
+    date TEXT,
+    title TEXT, url TEXT UNIQUE,
+    source TEXT, category TEXT, impact_score INTEGER
+);
 """
 
 
